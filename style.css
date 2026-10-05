@@ -1,0 +1,33 @@
+/* Custom mobile overrides */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.card {
+  transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.badge-mql5 {
+  background-color: #0d6efd;
+  color: #ffffff;
+}
+
+.badge-data-pipeline {
+  background-color: #20c997;
+  color: #ffffff;
+}
+
+.badge-backtesting {
+  background-color: #6f42c1;
+  color: #ffffff;
+}
+
+/* Ensure code samples in logs render cleanly */
+.log-text-block {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+  background-color: #f8f9fa;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  border-left: 3px solid #0d6efd;
+}

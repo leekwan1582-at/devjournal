@@ -1,9 +1,26 @@
 {
   "entries": [
     {
-      "id": 1,
-      "title": "First entry",
-      "content": "Example"
+      "id": "entry-001",
+      "timestamp": "2026-10-05T19:30:00Z",
+      "category": "MQL5",
+      "title": "Array out of range in OnTick execution",
+      "symptom": "EA halts execution on tick processing with error code 4002.",
+      "tried": "Checked loop bounds manually and printed buffer size.",
+      "rootCause": "Indicator handle was re-initialized inside the event loop without resizing the array buffer.",
+      "fix": "Moved handle initialization to OnInit() and applied ArraySetAsSeries() before accessing rates.",
+      "lesson": "Always separate indicator handle allocation from the tick execution logic."
+    },
+    {
+      "id": "entry-002",
+      "timestamp": "2026-10-05T19:45:00Z",
+      "category": "Data Pipeline",
+      "title": "Polars memory spike during tick resampling",
+      "symptom": "Out of memory crash when converting CSV tick data to Parquet.",
+      "tried": "Increased swap space and decreased chunk size.",
+      "rootCause": "Eager evaluation loaded the entire multi-gigabyte CSV into RAM at once.",
+      "fix": "Switched from pl.read_csv() to pl.scan_csv() for streaming lazy evaluation.",
+      "lesson": "Utilize lazy frames and streaming execution for high-frequency tick datasets."
     }
   ]
 }
