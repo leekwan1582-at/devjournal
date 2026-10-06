@@ -1,8 +1,43 @@
+// ── Configuration ────────────────────────────────────
 const API_URL = "http://localhost:3000/entries";
+
+// ── Application State ────────────────────────────────
 let entriesState = [];
 let activeEntry = null;
 
-// Date Formatter Helper (as specified in Wireframe)
+// ── DOM References ───────────────────────────────────
+const consoleContainer = document.getElementById("console-container");
+const consoleOutput    = document.getElementById("console-output");
+const clearConsoleBtn  = document.getElementById("clearConsoleBtn");
+
+// ── Console Output Panel ─────────────────────────────
+const CONSOLE_MAX_LINES = 100;
+
+function logMessage(kind, text) {
+  if (!consoleOutput) return; // guard if HTML hasn't loaded yet
+
+  const line = document.createElement("div");
+  line.className = `console-line console-line--${kind}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+
+  consoleOutput.appendChild(line);
+
+  // FIFO trim — drop oldest lines once we exceed the cap
+  while (consoleOutput.childElementCount > CONSOLE_MAX_LINES) {
+    consoleOutput.firstElementChild.remove();
+  }
+
+  consoleContainer.hidden = false;
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function clearConsole() {
+  if (!consoleOutput) return;
+  consoleOutput.innerHTML = "";
+  consoleContainer.hidden = true;
+}
+
+// ── Date Formatter Helper (as specified in Wireframe) ─
 function formatDate(isoString) {
   if (!isoString) return "";
   const dateObj = new Date(isoString);
@@ -12,11 +47,11 @@ function formatDate(isoString) {
   return `[dd-${year}-${month}-${day}]`;
 }
 
-// Mobile View-State Toggle Helper
+// ── Mobile View-State Toggle Helper ──────────────────
 function showDetailViewMobile() {
   const listView = document.getElementById("listView");
   const detailView = document.getElementById("detailView");
-  
+
   if (window.innerWidth < 768) {
     listView.classList.add("d-none");
     detailView.classList.remove("d-none");
@@ -31,13 +66,24 @@ function showListViewMobile() {
   detailView.classList.add("d-none");
 }
 
-// Fetch and Render Log Entries
+// ── Fetch and Render Log Entries ─────────────────────
 async function fetchEntries() {
+  logMessage("info", `Fetching entries from ${API_URL}`);
   try {
     const response = await axios.get(API_URL);
-    entriesState = response.data;
+
+    if (!Array.isArray(response.data)) {
+      logMessage("warn", `Unexpected response shape (expected array, got ${typeof response.data})`);
+      entriesState = [];
+    } else {
+      entriesState = response.data;
+      const n = entriesState.length;
+      logMessage("success", `Loaded ${n} ${n === 1 ? "entry" : "entries"}`);
+    }
+
     renderEntriesList(entriesState);
   } catch (err) {
+    logMessage("error", `Failed to load entries: ${err.message}`);
     console.error("Failed to load entries:", err);
   }
 }
@@ -83,7 +129,7 @@ function renderDetailedView(entry) {
       <span class="text-muted small">Timestamp: ${entry.timestamp}</span>
     </div>
     <h2 class="h4 fw-bold mb-3">${formatDate(entry.timestamp)} ${entry.title}</h2>
-    
+
     <div class="mb-2"><strong>Symptom:</strong><p class="text-secondary mb-1">${entry.symptom}</p></div>
     <div class="mb-2"><strong>Tried:</strong><p class="text-secondary mb-1">${entry.tried}</p></div>
     <div class="mb-2"><strong>Root Cause:</strong><p class="text-secondary mb-1">${entry.rootCause}</p></div>
@@ -94,12 +140,13 @@ function renderDetailedView(entry) {
   showDetailViewMobile();
 }
 
-// DOM Event Listeners
+// ── DOM Event Listeners ──────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   fetchEntries();
 
   document.getElementById("backToListBtn").addEventListener("click", showListViewMobile);
-  
+  clearConsoleBtn.addEventListener("click", clearConsole);
+
   // Responsive window resize watch
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 768) {
