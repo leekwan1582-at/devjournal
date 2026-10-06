@@ -1,146 +1,154 @@
-## Project Definition: Target User & Scope
+# TraceDiary: Project Specification
+
+## 1. Project Definition
 
 - **Project Name:** TraceDiary
 - **Target User:** Quantitative developers and algorithmic traders.
-- **Problem Statement:** Complex trading architectures involving MQL5 expert advisors, Python backtesting pipelines, and high-frequency tick data processing often generate obscure logic errors or execution anomalies. TraceDiary provides a streamlined, mobile-responsive interface to log these specific symptoms, track dead ends during troubleshooting, and create a searchable repository of root causes and fixes for future reference.
+- **Problem Statement:** Complex trading architectures involving MQL5 expert advisors, Python backtesting pipelines, and high-frequency tick data processing often generate obscure logic errors or execution anomalies. TraceDiary provides a streamlined, mobile-responsive interface to log these symptoms, track dead ends during troubleshooting, and build a searchable repository of root causes and fixes for future reference.
 
-## Step 1: Repository & Folder Structure
-
-You do need a project folder structure. Creating a GitHub repository first, cloning it to your WSL environment, and opening it in Visual Studio Code is the exact right workflow.
-
-Set up project root (devjournal) with the standard file architecture recommended:
-
-* `index.html`: The main structural entry point.
-* `style.css`: For any custom CSS overrides not handled by Bootstrap.
-* `script.js`: Your primary application logic (DOM manipulation, event listeners, API calls).
-* `data.js`: The data layer handling your state management, mock data arrays, or API endpoint configurations.
-
-
-* `README.md`: Essential for your final GitHub submission to explain the project to the assessor.
-
-
-## Step 2: Bootstrap 5 Interface
-
-Bootstrap 5 is an excellent choice for the web UI. It natively satisfies the project requirement to ensure the application is "mobile-responsive for at least one mobile device". Furthermore, using Bootstrap 5 for layout and styling aligns perfectly with the course's practical labs.
-
-### 2.3 FORM
-
-* **The Form:** Use Bootstrap form controls (`form-control`, `mb-3`) to build inputs for your six core fields: Tag/Title, Symptom, Tried, Root Cause, Fix, and Lesson. You can use a `<select>` dropdown for categories (e.g., "MQL5", "Python", "Data Pipeline") if you want to expand the Tag field.
-
-### 2.4 DISPLAY
-
-* **The Display:** Use Bootstrap Cards or a List Group (`list-group`) to render the saved debugging logs. Each card must include an "Edit" button and a "Delete" button to fulfill the application's required interaction design.
-
-
-### 2.2 ICONS
-
-Here are the recommended Bootstrap Icons (`bi`) tailored specifically for **TraceDiary** and its quantitative/algorithmic trading context:
-
-### 2.3 MOBILE WIREFRAME
-![alt text](Gemini_Generated_wireframe.jpeg)
 ---
 
-### 1. Logo
+## 2. Repository & Folder Structure
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+Workflow: create the GitHub repository first, clone it into WSL, and open it in Visual Studio Code.
 
-Since TraceDiary combines debugging logs with trading and data pipelines, these icons capture both software debugging and analytics:
+```
+TraceDiary/
+├── index.html          # Main structural entry point
+├── style.css           # Custom CSS overrides not handled by Bootstrap
+├── scripts.js          # Application logic (DOM, events, CRUD, API calls)
+├── data.js             # Data layer (state array, API endpoint configuration)
+├── db.json             # JSON Server data file, shape defined in section 5
+├── entries.schema.json # Design-time JSON Schema, defined in section 5
+└── README.md           # Project overview, setup steps, and data dictionary for the assessor
+```
 
-- **`bi-bug-fill`** or **`bi-bug`** — Direct representation of debugging and bug tracking.
-- **`bi-journal-code`** — Represents a technical execution diary or code log (_Top Recommendation_).
-- **`bi-terminal-split`** or **`bi-terminal`** — Gives a high-frequency developer/CLI vibe.
-- **`bi-graph-up-arrow`** — Highlights algorithmic trading performance and quantitative workflows.
+---
 
-**Usage:**
+## 3. Interface (Bootstrap 5)
+
+Bootstrap 5 provides the layout and styling and satisfies the requirement that the app is **mobile-responsive for at least one mobile device** (document the tested device in the README).
+
+### 3.1 Mobile Wireframe
+
+![Mobile wireframe](Gemini_Generated_wireframe.jpeg)
+
+### 3.2 Form
+
+Use Bootstrap form controls (`form-control`, `mb-3`) for the entry fields:
+
+| Field | Control |
+|---|---|
+| Category | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure) |
+| Title | text input |
+| Symptom | textarea |
+| Tried | textarea |
+| Root Cause | textarea |
+| Fix | textarea |
+| Lesson | text input |
+
+The six core fields are Title, Symptom, Tried, Root Cause, Fix, and Lesson. Category is a seventh field that acts as the tag.
+
+### 3.3 Display
+
+Render saved logs as Bootstrap Cards. Each card must include an **Edit** button and a **Delete** button.
+
+### 3.4 Icons
+
+Load Bootstrap Icons:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+```
+
+**Logo** (`bi-journal-code` is the primary choice)
 
 ```html
 <i class="bi bi-journal-code me-2"></i> TRACE DIARY
 ```
 
----
+Alternatives: `bi-bug-fill`, `bi-terminal-split`, `bi-graph-up-arrow`.
 
-### 2. Account
-
-- **`bi-person-circle`** — Clean, standard user profile header icon (_Top Recommendation_).
-- **`bi-person-badge`** — Fits developer credentials / API key management settings.
-- **`bi-person-gear`** — Great if account settings include developer configurations or broker API keys.
-
-**Usage:**
+**Account**
 
 ```html
 <i class="bi bi-person-circle"></i>
 ```
 
----
+Alternatives: `bi-person-badge`, `bi-person-gear`.
 
-### 3. CRUD Operations
+**CRUD operations**
 
-#### Create
-
-- **`bi-plus-lg`** or **`bi-plus-circle-fill`** — For the Floating Action Button (FAB) or "New Entry" button.
-- **`bi-journal-plus`** — Expresses adding a new diary log entry.
-
-#### Read
-
-- **`bi-eye`** or **`bi-book-half`** — Viewing entry details.
-- **`bi-search`** — Searching/filtering log history in the header.
-
-#### Update
-
-- **`bi-pencil-square`** or **`bi-pencil`** — Standard edit icon for updating symptoms, root causes, or fixes.
-
-#### Delete
-
-- **`bi-trash`** or **`bi-trash3-fill`** — Removing redundant or duplicate entries.
-
-**Usage Summary:**
+| Operation | Icon | Use |
+|---|---|---|
+| Create | `bi-plus-lg` | Floating Action Button (FAB) for a new entry |
+| Read | `bi-search` | Search and filter log history in the header |
+| Update | `bi-pencil` | Edit an entry |
+| Delete | `bi-trash3` | Remove an entry |
 
 ```html
-<!-- Create -->
-<i class="bi bi-plus-lg"></i>
-<!-- Read -->
-<i class="bi bi-search"></i>
-<!-- Update -->
-<i class="bi bi-pencil-square"></i>
-<!-- Delete -->
-<i class="bi bi-trash3"></i>
+<i class="bi bi-plus-lg"></i>   <!-- Create -->
+<i class="bi bi-search"></i>    <!-- Read / Search -->
+<i class="bi bi-pencil"></i>    <!-- Update -->
+<i class="bi bi-trash3"></i>    <!-- Delete -->
 ```
+
+**Categories**
+
+| Category | Icon |
+|---|---|
+| MQL5 / Expert Advisors | `bi-cpu` |
+| Data Pipeline | `bi-diagram-3` or `bi-database` |
+
+**Structured fields**
+
+| Field | Icon |
+|---|---|
+| Symptom | `bi-exclamation-triangle` |
+| Tried | `bi-tools` or `bi-lightbulb` |
+| Root Cause | `bi-diagram-2` or `bi-tree` |
+| Fix | `bi-check2-circle` or `bi-wrench-adjustable` |
+| Lesson | `bi-bookmark-star` |
+
+**Navigation and layout**
+
+| Purpose | Icon |
+|---|---|
+| Filter by category | `bi-funnel` |
+| Sort chronologically | `bi-sort-down` |
+| Entry tap indicator (mobile list) | `bi-chevron-right` |
+| Back to list (mobile detail) | `bi-arrow-left` |
 
 ---
 
-### 4. Other Functional Icons (Categories, Status & Indicators)
+## 4. JavaScript Implementation (CRUD & API)
 
-#### Categories (MQL5 & Data Pipelines)
+The assessment grades vanilla JavaScript proficiency. Build Create, Read, Update, and Delete while meeting these milestones:
 
-- **`bi-cpu`** — Great tag/badge icon for **MQL5** / Expert Advisor execution logs.
-- **`bi-diagram-3`** or **`bi-database`** — Fits **Data Pipeline** / Polars / Pandas memory & ingestion issues.
+1. **State management (arrays and objects):** Define the entries array in `data.js`. Each entry is a JavaScript object with the fields in section 5.
+2. **DOM manipulation and events:** Use `document.addEventListener("DOMContentLoaded", ...)` as the entry point. Attach a `submit` listener to the form. Modify at least three properties across two DOM elements (for example text content, a class, or hiding/showing an element).
+3. **Structured logic:**
+   - at least one loop (rendering entries)
+   - at least one conditional branch (validating that required fields are not empty)
+   - custom functions where the return value of one is passed to another
+4. **Asynchronous operations (AJAX):** Use Axios to communicate with an external service. Implement at least one `GET` request to retrieve logs and at least one `POST`, `PUT`, or `PATCH` request to save or update them.
 
-#### Structured Fields (The 6 DD Capture Fields)
+**API:** JSON Server serves `db.json` at `http://localhost:3000/entries` (endpoint configured in `data.js`).
 
-- **`bi-exclamation-triangle`** — **Symptom** (Failure observed)
-- **`bi-tools`** or **`bi-lightbulb`** — **Tried** (Diagnostic steps & hypotheses)
-- **`bi-tree`** or **`bi-diagram-2`** — **Root Cause** (Underlying core issue)
-- **`bi-check2-circle`** or **`bi-wrench-adjustable`** — **Fix** (Code patch applied)
-- **`bi-bookmark-star`** — **Lesson** (Key rule of thumb takeaway)
+---
 
-#### Navigation & Layout controls
+## 5. Data Model
 
-- **`bi-funnel`** — Filter entries by category or tag.
-- **`bi-sort-down`** — Sort entries chronologically (`YYYY-MM-DD`).
-- **`bi-chevron-right`** — Indicating entry tap in mobile list view.
-- **`bi-arrow-left`** — Back button from detailed view to list view on mobile.
+### 5.1 JSON Schema (`entries.schema.json`)
 
-## Step 3: data/entries.json
-To document this JSON structure at design time without relying on actual runtime data, you should create a technical spec that maps the schema abstractly.
-The best approach is to define a strict JSON Schema alongside a readable Field Specification Table. This provides clear blueprints for developers or automated data validation pipelines.
-## 1. The Design-Time JSON Schema
-Save this file as entries.schema.json. It maps the blueprint, array structures, and format requirements explicitly:
+Design-time blueprint of the dataset. It documents the structure without relying on runtime data.
+
 ```json
 {
-  "$schema": "https://json-schema.org",
-  "$id": "https://example.com",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/entries.schema.json",
   "title": "Log Entries Dataset",
-  "description": "Schema configuration for recording technical development logs, errors, and lessons learned.",
+  "description": "Schema for recording technical development logs, errors, and lessons learned.",
   "type": "object",
   "properties": {
     "entries": {
@@ -156,7 +164,7 @@ Save this file as entries.schema.json. It maps the blueprint, array structures, 
           "timestamp": {
             "type": "string",
             "format": "date-time",
-            "description": "The date and time the log was generated, strictly in ISO 8601 UTC format."
+            "description": "Date and time the log was generated, in ISO 8601 UTC format."
           },
           "category": {
             "type": "string",
@@ -165,11 +173,11 @@ Save this file as entries.schema.json. It maps the blueprint, array structures, 
           },
           "title": {
             "type": "string",
-            "description": "A brief synopsis summarizing the bug or milestone."
+            "description": "A brief synopsis of the bug or milestone."
           },
           "symptom": {
             "type": "string",
-            "description": "The visible error, logs, or system behavior noticed during the issue."
+            "description": "The visible error, logs, or system behavior noticed."
           },
           "tried": {
             "type": "string",
@@ -181,11 +189,11 @@ Save this file as entries.schema.json. It maps the blueprint, array structures, 
           },
           "fix": {
             "type": "string",
-            "description": "The explicit programmatic code or system fix applied to resolve the problem."
+            "description": "The code or system change applied to resolve the problem."
           },
           "lesson": {
             "type": "string",
-            "description": "Key structural takeaways or architectural notes to avoid recurring regressions."
+            "description": "Key takeaway or architectural note to avoid recurrence."
           }
         },
         "required": ["id", "timestamp", "category", "title", "symptom", "tried", "rootCause", "fix", "lesson"],
@@ -198,39 +206,22 @@ Save this file as entries.schema.json. It maps the blueprint, array structures, 
 }
 ```
 
-## 2. Markdown Data Dictionary (Technical Documentation)
-Include this structural breakdown directly inside your project's README.md or design wiki. It breaks down the data rules in a scannable format.
-## Top-Level Structure
+### 5.2 Data Dictionary
 
-* entries (Array of Objects): A mandatory list of recorded system and development logs.
+**Top-level structure**
 
-## Entry Item Properties
+- `entries` (array of objects): mandatory list of recorded logs.
 
-| Field Name | Type | Format / Constraints | Required | Description |
+**Entry item properties**
+
+| Field | Type | Format / Constraints | Required | Description |
 |---|---|---|---|---|
-| id | String | Alphanumeric unique string | Yes | Unique identifier tracking the entry record. |
-| timestamp | String | ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ) | Yes | Time when the event or record occurred. |
-| category | String | Plain Text | Yes | The technical component domain (e.g., MQL5, Data Pipeline). |
-| title | String | Plain Text | Yes | Clear title explaining the scope of the log. |
-| symptom | String | Plain Text | Yes | Observable errors, console logs, or crashes. |
-| tried | String | Plain Text | Yes | Actions taken prior to identifying the main cause. |
-| rootCause | String | Plain Text | Yes | Core reason behind the application breakdown. |
-| fix | String | Plain Text | Yes | Precise steps implemented to safely address the issue. |
-| lesson | String | Plain Text | Yes | Best practice guidelines abstracted from the event. |
-
-
-## Step 4: JavaScript Implementation (CRUD & APIs)
-
-The core of the assessment grades your vanilla JavaScript proficiency. You must build the Create, Read, Update, and Delete (CRUD) functionality while hitting specific technical milestones:
-
-1. **State Management (Arrays & Objects):** Define an array in `data.js` to store your diary entries, where each entry is a JavaScript object containing your six required fields.
-
-
-2. **DOM Manipulation & Events:** Use `document.addEventListener("DOMContentLoaded", ...)` as your entry point. Attach an event listener to the form's `submit` event to capture the user's input. You must modify at least three properties across two DOM elements (e.g., changing text content, altering a class, or hiding/showing an element).
-
-
-3. **Structured Logic:** Incorporate at least one loop (to render the diary entries), one conditional branch (to validate that required fields aren't empty), and custom functions where the return value of one is passed to another.
-
-
-4. **Asynchronous Operations (AJAX):** Your application must communicate with an external service using asynchronous code. You can use Axios to fetch data from a JSON resource (like JSONBin). To meet the criteria, implement at least one `GET` request to retrieve your logs, and at least one `POST`, `PUT`, or `PATCH` request to save or update them.
-
+| `id` | String | Unique alphanumeric string | Yes | Unique identifier for the entry. |
+| `timestamp` | String | ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`) | Yes | When the record was created. |
+| `category` | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure` | Yes | Technical domain of the log. |
+| `title` | String | Plain text | Yes | Short title describing the scope of the log. |
+| `symptom` | String | Plain text | Yes | Observable errors, console output, or crashes. |
+| `tried` | String | Plain text | Yes | Actions taken before the cause was found. |
+| `rootCause` | String | Plain text | Yes | Core reason behind the failure. |
+| `fix` | String | Plain text | Yes | Steps taken to resolve the issue. |
+| `lesson` | String | Plain text | Yes | Best-practice takeaway from the event. |

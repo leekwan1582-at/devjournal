@@ -1,14 +1,31 @@
 // ── Configuration ────────────────────────────────────
-const API_URL = "http://localhost:3000/entries";
+const API_URL = document.querySelector('meta[name="api-url"]')?.content
+  || "http://localhost:3000/entries";
+
+// Interim single source of truth for category options
+const CATEGORY_OPTIONS = ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure", "Javascript"];
 
 // ── Application State ────────────────────────────────
 let entriesState = [];
 let activeEntry = null;
+let editingEntry = null;
+let searchTerm = "";
+let categoryFilterValue = "ALL";
+let sortOption = "default";
 
 // ── DOM References ───────────────────────────────────
 const consoleContainer = document.getElementById("console-container");
 const consoleOutput    = document.getElementById("console-output");
 const clearConsoleBtn  = document.getElementById("clearConsoleBtn");
+const listView         = document.getElementById("listView");
+const detailView       = document.getElementById("detailView");
+const entriesList      = document.getElementById("entriesList");
+const entryModalElement = document.getElementById("entryModal");
+const logForm          = document.getElementById("logForm");
+const searchInput      = document.getElementById("searchInput");
+const categoryFilter   = document.getElementById("categoryFilter");
+const sortSelect       = document.getElementById("sortSelect");
+const refreshBtn       = document.getElementById("refreshBtn");
 
 // ── Console Output Panel ─────────────────────────────
 const CONSOLE_MAX_LINES = 100;
@@ -37,38 +54,219 @@ function clearConsole() {
   consoleContainer.hidden = true;
 }
 
+// ── Dialog Helpers ───────────────────────────────────
+function showToast(message, icon = "success") {
+  if (typeof Swal === "undefined") return;
+
+  Swal.fire({
+    toast: true,
+    position: "top-end",
+    icon,
+    title: message,
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+  });
+}
+
+function showErrorDialog(title, message) {
+  if (typeof Swal === "undefined") return;
+
+  Swal.fire({
+    icon: "error",
+    title,
+    text: message,
+  });
+}
+
+function describeRequestError(error) {
+  if (error && error.response) {
+    const status = error.response.status;
+    if (status >= 500) return `Server error (${status}). Please try again later.`;
+    if (status === 404) return "The requested entry was not found (404).";
+    if (status >= 400) return `Request failed with status ${status}.`;
+    return `Unexpected response (${status}).`;
+  }
+
+  if (error && error.code === "ECONNABORTED") return "The request timed out.";
+  if (error && error.request) return "Network error. Is the JSON Server running?";
+  return error && error.message ? error.message : "Unknown error.";
+}
+
 // ── Date Formatter Helper (as specified in Wireframe) ─
 function formatDate(isoString) {
   if (!isoString) return "";
   const dateObj = new Date(isoString);
+  if (Number.isNaN(dateObj.getTime())) return "";
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, "0");
   const day = String(dateObj.getDate()).padStart(2, "0");
-  return `[dd-${year}-${month}-${day}]`;
+  return `[${year}-${month}-${day}]`;
+}
+
+// ── HTML Sanitization ────────────────────────────────
+const HTML_ESCAPE_MAP = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+// Time: O(n), Space: O(n)
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 // ── Mobile View-State Toggle Helper ──────────────────
-function showDetailViewMobile() {
-  const listView = document.getElementById("listView");
-  const detailView = document.getElementById("detailView");
+const MOBILE_BREAKPOINT_PX = 768;
+const RESIZE_DEBOUNCE_MS = 150;
+const SEARCH_DEBOUNCE_MS = 150;
 
-  if (window.innerWidth < 768) {
+let isMobileLayout = null;
+
+function showDetailViewMobile() {
+  if (window.innerWidth < MOBILE_BREAKPOINT_PX) {
     listView.classList.add("d-none");
     detailView.classList.remove("d-none");
   }
 }
 
 function showListViewMobile() {
-  const listView = document.getElementById("listView");
-  const detailView = document.getElementById("detailView");
-
   listView.classList.remove("d-none");
   detailView.classList.add("d-none");
+}
+
+function applyResponsiveLayout() {
+  const nextIsMobile = window.innerWidth < MOBILE_BREAKPOINT_PX;
+
+  if (nextIsMobile === isMobileLayout) return;
+  isMobileLayout = nextIsMobile;
+
+  if (nextIsMobile) {
+    showListViewMobile();
+  } else {
+    listView.classList.remove("d-none");
+    detailView.classList.remove("d-none");
+  }
+}
+
+// ── List State Helpers ───────────────────────────────
+function clearEntriesList() {
+  if (typeof bootstrap !== "undefined") {
+    entriesList.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((tooltipTrigger) => {
+      const tooltipInstance = bootstrap.Tooltip.getInstance(tooltipTrigger);
+      if (tooltipInstance) {
+        tooltipInstance.dispose();
+      }
+    });
+  }
+
+  entriesList.innerHTML = "";
+}
+
+function renderListMessage(message) {
+  clearEntriesList();
+
+  const placeholder = document.createElement("p");
+  placeholder.className = "text-muted text-center my-4";
+  placeholder.textContent = message;
+  entriesList.appendChild(placeholder);
+}
+
+// ── Filter and Sort ──────────────────────────────────
+function populateCategoryOptions() {
+  const selectedCategory = categoryFilter.value;
+
+  categoryFilter.innerHTML = "";
+  const allOption = document.createElement("option");
+  allOption.value = "ALL";
+  allOption.textContent = "All Categories";
+  categoryFilter.appendChild(allOption);
+
+  const formCategorySelect = document.getElementById("category");
+  formCategorySelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select Category";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  formCategorySelect.appendChild(placeholder);
+
+  CATEGORY_OPTIONS.forEach((category) => {
+    const filterOption = document.createElement("option");
+    filterOption.value = category;
+    filterOption.textContent = category;
+    categoryFilter.appendChild(filterOption);
+
+    const formOption = document.createElement("option");
+    formOption.value = category;
+    formOption.textContent = category;
+    formCategorySelect.appendChild(formOption);
+  });
+
+  categoryFilter.value = CATEGORY_OPTIONS.includes(selectedCategory) ? selectedCategory : "ALL";
+}
+
+// Time: O(n log n), Space: O(n)
+function filterAndSortEntries(entries, options) {
+  const query = options.searchTerm.trim().toLowerCase();
+
+  const filtered = entries.filter((entry) => {
+    if (options.category !== "ALL" && entry.category !== options.category) return false;
+    if (query === "") return true;
+    return [entry.title, entry.symptom, entry.fix].some(
+      (field) => String(field).toLowerCase().includes(query)
+    );
+  });
+
+  return sortEntries(filtered, options.sort);
+}
+
+// Time: O(n log n), Space: O(n)
+function sortEntries(entries, sort) {
+  const sorted = [...entries];
+
+  if (sort === "date-desc") {
+    return sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+  if (sort === "date-asc") {
+    return sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  }
+  if (sort === "title-asc") {
+    return sorted.sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  }
+  if (sort === "category-asc") {
+    return sorted.sort((a, b) => String(a.category).localeCompare(String(b.category)));
+  }
+  return sorted;
+}
+
+function applyFilters() {
+  if (entriesState.length === 0) {
+    renderListMessage("No entries yet");
+    return;
+  }
+
+  const visibleEntries = filterAndSortEntries(entriesState, {
+    searchTerm,
+    category: categoryFilterValue,
+    sort: sortOption,
+  });
+
+  if (visibleEntries.length === 0) {
+    renderListMessage("No matching entries");
+    return;
+  }
+
+  renderEntriesList(visibleEntries);
 }
 
 // ── Fetch and Render Log Entries ─────────────────────
 async function fetchEntries() {
   logMessage("info", `Fetching entries from ${API_URL}`);
+  renderListMessage("Loading…");
+
   try {
     const response = await axios.get(API_URL);
 
@@ -81,38 +279,74 @@ async function fetchEntries() {
       logMessage("success", `Loaded ${n} ${n === 1 ? "entry" : "entries"}`);
     }
 
-    renderEntriesList(entriesState);
+    populateCategoryOptions();
+    applyFilters();
   } catch (err) {
     logMessage("error", `Failed to load entries: ${err.message}`);
     console.error("Failed to load entries:", err);
+    renderListMessage(describeRequestError(err));
   }
 }
 
 function renderEntriesList(entries) {
-  const listContainer = document.getElementById("entriesList");
-  listContainer.innerHTML = "";
+  clearEntriesList();
+
+  if (!Array.isArray(entries)) {
+    logMessage("warn", `renderEntriesList expected an array, got ${typeof entries}`);
+    renderListMessage("No entries yet");
+    return;
+  }
 
   entries.forEach((item) => {
     const card = document.createElement("div");
     card.className = "card shadow-sm cursor-pointer border-start border-4 border-primary";
     card.style.cursor = "pointer";
+    card.dataset.entryId = item.id;
+
+    if (activeEntry !== null && item.id === activeEntry.id) {
+      card.classList.add("active-card");
+    }
 
     card.innerHTML = `
       <div class="card-body p-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <span class="badge bg-secondary">${item.category}</span>
-          <span class="small text-muted">${formatDate(item.timestamp)}</span>
+          <span class="badge bg-secondary">${escapeHtml(item.category)}</span>
+          <span class="small text-muted">Record ${entriesState.indexOf(item) + 1}/${entriesState.length} · ${formatDate(item.timestamp)}</span>
         </div>
-        <h3 class="h6 card-title mb-1 fw-bold text-dark">${item.title}</h3>
+        <h3 class="h6 card-title mb-1 fw-bold text-dark">${escapeHtml(item.title)}</h3>
         <div class="d-flex justify-content-between align-items-center mt-2">
           <span class="small text-primary">Tap to view details</span>
-          <i class="bi bi-chevron-right text-muted"></i>
+          <div class="d-flex align-items-center gap-2">
+            <div class="card-actions d-flex align-items-center gap-1">
+              <button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" data-bs-toggle="tooltip" data-bs-title="Edit Entry" aria-label="Edit Entry"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" data-bs-toggle="tooltip" data-bs-title="Delete Entry" aria-label="Delete Entry"><i class="bi bi-trash3"></i></button>
+            </div>
+            <i class="bi bi-chevron-right text-muted"></i>
+          </div>
         </div>
       </div>
     `;
 
-    card.addEventListener("click", () => renderDetailedView(item));
-    listContainer.appendChild(card);
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".card-actions")) return;
+      renderDetailedView(item);
+    });
+    entriesList.appendChild(card);
+
+    card.querySelector(".card-delete-btn").addEventListener("click", () => {
+      deleteEntry(item);
+    });
+
+    card.querySelector(".card-edit-btn").addEventListener("click", () => {
+      openEditForm(item);
+    });
+
+    // Buttons are created on the fly, so initialize their tooltips after insertion
+    if (typeof bootstrap !== "undefined") {
+      card.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((tooltipTrigger) => {
+        new bootstrap.Tooltip(tooltipTrigger);
+      });
+    }
   });
 }
 
@@ -120,38 +354,339 @@ function renderDetailedView(entry) {
   activeEntry = entry;
   const detailContainer = document.getElementById("detailContent");
   const actionGroup = document.getElementById("detailActionGroup");
+  const recordPosition = entriesState.indexOf(entry) + 1;
 
   actionGroup.classList.remove("d-none");
   detailContainer.innerHTML = `
     <div class="mb-3">
-      <span class="text-muted small">Entry ID: ${entry.id}</span><br/>
-      <span class="badge bg-primary me-2">${entry.category}</span>
-      <span class="text-muted small">Timestamp: ${entry.timestamp}</span>
+      <span class="text-muted small">Entry ID: ${escapeHtml(entry.id)}</span><br/>
+      <span class="badge bg-primary me-2">${escapeHtml(entry.category)}</span>
+      <span class="text-muted small">Timestamp: ${formatDate(entry.timestamp)}</span>
+      <span class="text-muted small ms-2">Record ${recordPosition}/${entriesState.length}</span>
     </div>
-    <h2 class="h4 fw-bold mb-3">${formatDate(entry.timestamp)} ${entry.title}</h2>
+    <h2 class="h4 fw-bold mb-3">${formatDate(entry.timestamp)} ${escapeHtml(entry.title)}</h2>
 
-    <div class="mb-2"><strong>Symptom:</strong><p class="text-secondary mb-1">${entry.symptom}</p></div>
-    <div class="mb-2"><strong>Tried:</strong><p class="text-secondary mb-1">${entry.tried}</p></div>
-    <div class="mb-2"><strong>Root Cause:</strong><p class="text-secondary mb-1">${entry.rootCause}</p></div>
-    <div class="mb-2"><strong>Fix:</strong><p class="text-secondary mb-1">${entry.fix}</p></div>
-    <div class="mb-2"><strong>Lesson:</strong><p class="text-secondary mb-1">${entry.lesson}</p></div>
+    <div class="mb-2"><strong>Symptom:</strong><p class="text-secondary mb-1">${escapeHtml(entry.symptom)}</p></div>
+    <div class="mb-2"><strong>Tried:</strong><p class="text-secondary mb-1">${escapeHtml(entry.tried)}</p></div>
+    <div class="mb-2"><strong>Root Cause:</strong><p class="text-secondary mb-1">${escapeHtml(entry.rootCause)}</p></div>
+    <div class="mb-2"><strong>Fix:</strong><p class="text-secondary mb-1">${escapeHtml(entry.fix)}</p></div>
+    <div class="mb-2"><strong>Lesson:</strong><p class="text-secondary mb-1">${escapeHtml(entry.lesson)}</p></div>
   `;
 
+  highlightActiveCard(entry.id);
   showDetailViewMobile();
+}
+
+function highlightActiveCard(entryId) {
+  entriesList.querySelectorAll(".card").forEach((card) => {
+    card.classList.toggle("active-card", card.dataset.entryId === String(entryId));
+  });
+}
+
+// ── CRUD: Delete ─────────────────────────────────────
+async function confirmDelete(entryLabel) {
+  if (typeof Swal === "undefined") {
+    return window.confirm(`Delete "${entryLabel}"? This cannot be undone.`);
+  }
+
+  const result = await Swal.fire({
+    title: "Delete entry?",
+    text: `"${entryLabel}" will be permanently removed.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Delete",
+    confirmButtonColor: "#dc3545",
+    cancelButtonText: "Cancel",
+    reverseButtons: true,
+  });
+
+  return result.isConfirmed;
+}
+
+function resetDetailView() {
+  activeEntry = null;
+  highlightActiveCard(null);
+  document.getElementById("detailActionGroup").classList.add("d-none");
+  document.getElementById("detailContent").innerHTML = `
+    <p class="text-muted text-center my-5">Select an entry from the list to view full details.</p>
+  `;
+}
+
+async function deleteEntry(entry) {
+  const entryId = entry.id;
+
+  logMessage("info", `Deleting entry ${entryId}`);
+
+  const confirmed = await confirmDelete(entry.title);
+  if (!confirmed) {
+    logMessage("info", `Deleting entry cancel ${entryId}`);
+    return;
+  }
+
+  try {
+    await axios.delete(`${API_URL}/${entryId}`);
+
+    const index = entriesState.indexOf(entry);
+    if (index !== -1) {
+      entriesState.splice(index, 1);
+    }
+    resetDetailView();
+    applyFilters();
+
+    showListViewMobile();
+    logMessage("success", `Deleted entry ${entryId}`);
+    showToast("Entry deleted");
+  } catch (err) {
+    logMessage("error", `Failed to delete entry: ${err.message}`);
+    console.error("Failed to delete entry:", err);
+    showErrorDialog("Delete failed", describeRequestError(err));
+    applyFilters();
+  }
+}
+
+// ── Entry Modal (Bootstrap when available, manual fallback otherwise) ─
+function getEntryModal() {
+  if (typeof bootstrap === "undefined" || typeof bootstrap.Modal === "undefined") return null;
+  return bootstrap.Modal.getOrCreateInstance(entryModalElement);
+}
+
+function showEntryModal() {
+  const entryModal = getEntryModal();
+  if (entryModal !== null) {
+    entryModal.show();
+    return;
+  }
+
+  entryModalElement.classList.add("show");
+  entryModalElement.style.display = "block";
+  entryModalElement.setAttribute("aria-modal", "true");
+  entryModalElement.removeAttribute("aria-hidden");
+  document.body.classList.add("modal-open");
+  document.body.style.overflow = "hidden";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop fade show";
+  backdrop.id = "entryModalBackdrop";
+  document.body.appendChild(backdrop);
+}
+
+function hideEntryModal() {
+  const entryModal = getEntryModal();
+  if (entryModal !== null) {
+    entryModal.hide();
+    return;
+  }
+
+  entryModalElement.classList.remove("show");
+  entryModalElement.style.display = "none";
+  entryModalElement.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  document.body.style.overflow = "";
+
+  const backdrop = document.getElementById("entryModalBackdrop");
+  if (backdrop !== null) {
+    backdrop.remove();
+  }
+
+  resetEntryForm();
+}
+
+function resetEntryForm() {
+  editingEntry = null;
+  logForm.reset();
+  document.getElementById("entryId").value = "";
+}
+
+// ── CRUD: Edit ───────────────────────────────────────
+function populateEntryForm(entry) {
+  document.getElementById("entryId").value = entry.id;
+  document.getElementById("category").value = entry.category;
+  document.getElementById("title").value = entry.title;
+  document.getElementById("symptom").value = entry.symptom;
+  document.getElementById("tried").value = entry.tried;
+  document.getElementById("rootCause").value = entry.rootCause;
+  document.getElementById("fix").value = entry.fix;
+  document.getElementById("lesson").value = entry.lesson;
+  document.getElementById("formModalTitle").textContent = "Edit Entry";
+}
+
+function collectEntryFormPayload() {
+  return {
+    category: document.getElementById("category").value.trim(),
+    title: document.getElementById("title").value.trim(),
+    symptom: document.getElementById("symptom").value.trim(),
+    tried: document.getElementById("tried").value.trim(),
+    rootCause: document.getElementById("rootCause").value.trim(),
+    fix: document.getElementById("fix").value.trim(),
+    lesson: document.getElementById("lesson").value.trim(),
+  };
+}
+
+function validateEntryPayload(payload) {
+  return Object.values(payload).every((value) => value.length > 0);
+}
+
+function openEditForm(entry) {
+  editingEntry = entry;
+  populateEntryForm(entry);
+  showEntryModal();
+}
+
+async function updateEntry(entry, payload) {
+  const body = { ...payload, id: entry.id };
+
+  if (entry.timestamp) {
+    body.timestamp = entry.timestamp;
+  }
+
+  const response = await axios.put(`${API_URL}/${entry.id}`, body);
+  return response.data;
+}
+
+// ── CRUD: Create ─────────────────────────────────────
+async function createEntry(payload) {
+  const body = { ...payload, timestamp: new Date().toISOString() };
+  const response = await axios.post(API_URL, body);
+  return response.data;
+}
+
+function openCreateForm() {
+  resetEntryForm();
+  document.getElementById("formModalTitle").textContent = "Create New Entry";
+  showEntryModal();
+}
+
+async function handleEntryFormSubmit(event) {
+  event.preventDefault();
+
+  const isCreate = editingEntry === null;
+  const payload = collectEntryFormPayload();
+
+  if (!validateEntryPayload(payload)) {
+    if (typeof Swal !== "undefined") {
+      Swal.fire({ icon: "warning", title: "Missing fields", text: "All fields are required." });
+    }
+    return;
+  }
+
+  try {
+    if (isCreate) {
+      const createdEntry = await createEntry(payload);
+      entriesState.push(createdEntry);
+      hideEntryModal();
+      applyFilters();
+      logMessage("success", `Created entry ${createdEntry.id}`);
+      showToast("Entry created");
+      return;
+    }
+
+    const updatedEntryId = editingEntry.id;
+    const updatedEntry = await updateEntry(editingEntry, payload);
+    const index = entriesState.indexOf(editingEntry);
+    if (index !== -1) {
+      entriesState[index] = updatedEntry;
+    }
+
+    hideEntryModal();
+    applyFilters();
+    renderDetailedView(updatedEntry);
+    logMessage("success", `Updated entry ${updatedEntryId}`);
+    showToast("Entry updated");
+  } catch (err) {
+    const action = isCreate ? "create" : "update";
+    logMessage("error", `Failed to ${action} entry: ${err.message}`);
+    console.error(`Failed to ${action} entry:`, err);
+    showErrorDialog(isCreate ? "Create failed" : "Update failed", describeRequestError(err));
+  }
+}
+
+// ── Keyboard Helpers ─────────────────────────────────
+function isTypingTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  const tagName = target.tagName;
+  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
 }
 
 // ── DOM Event Listeners ──────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   fetchEntries();
+  applyResponsiveLayout();
 
   document.getElementById("backToListBtn").addEventListener("click", showListViewMobile);
   clearConsoleBtn.addEventListener("click", clearConsole);
 
-  // Responsive window resize watch
-  window.addEventListener("resize", () => {
-    if (window.innerWidth >= 768) {
-      document.getElementById("listView").classList.remove("d-none");
-      document.getElementById("detailView").classList.remove("d-none");
+  document.getElementById("deleteEntryBtn").addEventListener("click", () => {
+    if (activeEntry !== null) {
+      deleteEntry(activeEntry);
     }
+  });
+
+  document.getElementById("editEntryBtn").addEventListener("click", () => {
+    if (activeEntry !== null) {
+      openEditForm(activeEntry);
+    }
+  });
+
+  document.getElementById("openFormBtn").addEventListener("click", openCreateForm);
+
+  // Search / category / sort / refresh controls
+  let searchTimeoutId = null;
+  searchInput.addEventListener("input", () => {
+    if (searchTimeoutId !== null) {
+      clearTimeout(searchTimeoutId);
+    }
+    searchTimeoutId = setTimeout(() => {
+      searchTerm = searchInput.value;
+      applyFilters();
+    }, SEARCH_DEBOUNCE_MS);
+  });
+  categoryFilter.addEventListener("change", () => {
+    categoryFilterValue = categoryFilter.value;
+    applyFilters();
+  });
+  sortSelect.addEventListener("change", () => {
+    sortOption = sortSelect.value;
+    applyFilters();
+  });
+  refreshBtn.addEventListener("click", fetchEntries);
+
+  logForm.addEventListener("submit", handleEntryFormSubmit);
+  entryModalElement.addEventListener("hidden.bs.modal", resetEntryForm);
+
+  // Manual dismiss handlers cover the case where Bootstrap JS is unavailable
+  entryModalElement.addEventListener("click", (event) => {
+    if (event.target.closest('[data-bs-dismiss="modal"]')) {
+      hideEntryModal();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.id === "entryModalBackdrop") {
+      hideEntryModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (entryModalElement.classList.contains("show")) {
+        hideEntryModal();
+      } else {
+        resetDetailView();
+        showListViewMobile();
+      }
+      return;
+    }
+
+    if (event.key === "n" && !entryModalElement.classList.contains("show") && !isTypingTarget(event.target)) {
+      openCreateForm();
+    }
+  });
+
+  // Responsive window resize watch (debounced, handles both grow and shrink)
+  let resizeTimeoutId = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimeoutId !== null) {
+      clearTimeout(resizeTimeoutId);
+    }
+    resizeTimeoutId = setTimeout(applyResponsiveLayout, RESIZE_DEBOUNCE_MS);
   });
 });

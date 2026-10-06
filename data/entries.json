@@ -1,26 +1,103 @@
 {
   "entries": [
     {
-      "id": "entry-001",
-      "timestamp": "2026-10-05T19:30:00Z",
       "category": "MQL5",
       "title": "Array out of range in OnTick execution",
       "symptom": "EA halts execution on tick processing with error code 4002.",
       "tried": "Checked loop bounds manually and printed buffer size.",
       "rootCause": "Indicator handle was re-initialized inside the event loop without resizing the array buffer.",
       "fix": "Moved handle initialization to OnInit() and applied ArraySetAsSeries() before accessing rates.",
-      "lesson": "Always separate indicator handle allocation from the tick execution logic."
+      "lesson": "<>Always separate indicator handle allocation from the tick execution logic.",
+      "id": "entry-001",
+      "timestamp": "2026-10-05T19:30:00Z"
     },
     {
       "id": "entry-002",
+      "timestamp": "2026-10-05T19:35:00Z",
+      "category": "MQL5",
+      "title": "OnTradeTransaction missing fill notification during slippage",
+      "symptom": "Pending orders execution state remains unverified during fast market events.",
+      "tried": "Added OrderSelect() polling loop inside OnTick().",
+      "rootCause": "Trade transaction events were dropping due to unhandled TRADE_TRANSACTION_DEAL_ADD state transitions.",
+      "fix": "Refactored OnTradeTransaction to explicitly filter for TRADE_TRANSACTION_DEAL_ADD and check deal entry type.",
+      "lesson": "Rely on explicit transaction deal types in OnTradeTransaction rather than polling order history."
+    },
+    {
+      "id": "entry-004",
       "timestamp": "2026-10-05T19:45:00Z",
       "category": "Data Pipeline",
-      "title": "Polars memory spike during tick resampling",
-      "symptom": "Out of memory crash when converting CSV tick data to Parquet.",
-      "tried": "Increased swap space and decreased chunk size.",
-      "rootCause": "Eager evaluation loaded the entire multi-gigabyte CSV into RAM at once.",
-      "fix": "Switched from pl.read_csv() to pl.scan_csv() for streaming lazy evaluation.",
-      "lesson": "Utilize lazy frames and streaming execution for high-frequency tick datasets."
+      "title": "DuckDB timestamp timezone mismatch on parquet join",
+      "symptom": "SQL queries fail with mismatch error between UTC and localized timestamps.",
+      "tried": "Attempted string casting with strftime() inside SQL queries.",
+      "rootCause": "DuckDB inferred microsecond precision with local offset from raw tick inputs, conflicting with ZSTD Parquet schema.",
+      "fix": "Standardized all ingested timestamps to epoch milliseconds UTC using explicitly typed schema definitions.",
+      "lesson": "Enforce UTC epoch normalization at ingestion time before writing to Parquet repositories."
+    },
+    {
+      "id": "entry-005",
+      "timestamp": "2026-10-05T19:50:00Z",
+      "category": "Backtesting",
+      "title": "Vectorbt lookahead bias in rolling ATR calculation",
+      "symptom": "Backtest produces unrealistically high Sharpe ratio during volatile market regimes.",
+      "tried": "Re-indexed price matrices and adjusted stop-loss percentage multipliers.",
+      "rootCause": "Indicator shift parameter was omitted, allowing signal generation using current bar close instead of prior bar close.",
+      "fix": "Applied .shift(1) to trailing volatility indicators before generating entry signals.",
+      "lesson": "Always verify lag operators on feature matrices to eliminate lookahead bias in vectorised engine calculations."
+    },
+    {
+      "id": "entry-006",
+      "timestamp": "2026-10-05T19:55:00Z",
+      "category": "Backtesting",
+      "title": "Backtrader order execution mismatch on gap opens",
+      "symptom": "Stop-loss orders fill at exact trigger price instead of opening gapped price.",
+      "tried": "Overrode next() method and forced market orders on current bar.",
+      "rootCause": "Cheat-on-open parameter was enabled by default in broker execution settings.",
+      "fix": "Set cheat_on_open=False and configured realistic slip_open=True slippage models.",
+      "lesson": "Ensure realistic broker settings for gap-handling during event-driven backtesting execution."
+    },
+    {
+      "id": "entry-007",
+      "timestamp": "2026-10-05T20:00:00Z",
+      "category": "Infrastructure",
+      "title": "PostgreSQL Walk-Forward connection exhaustion",
+      "symptom": "Database connection pool drops workers with FATAL: remaining connection slots are reserved error.",
+      "tried": "Increased max_connections in postgresql.conf.",
+      "rootCause": "Parallel optimization tasks failed to release pooled connections upon worker process completion.",
+      "fix": "Implemented context-managed connection pool wrapper with explicit client cleanup in try/finally blocks.",
+      "lesson": "Always manage worker node database lifecycle with context managers during multi-process jobs."
+    },
+    {
+      "id": "entry-008",
+      "timestamp": "2026-10-05T20:05:00Z",
+      "category": "Infrastructure",
+      "title": "WSL2 disk space growth during heavy DuckDB queries",
+      "symptom": "Ubuntu WSL virtual disk image expands rapidly and exhausts host C: drive space.",
+      "tried": "Ran apt clean and deleted temporary parquet logs.",
+      "rootCause": "DuckDB temporary storage spilled to /tmp directory on VHDX without automated shrinking.",
+      "fix": "Configured temp_directory setting in DuckDB to point to dedicated external mount and ran disk compacting in PowerShell.",
+      "lesson": "Redirect database spill directories away from the default root WSL filesystem."
+    },
+    {
+      "id": "entry-009",
+      "timestamp": "2026-10-05T20:10:00Z",
+      "category": "JavaScript",
+      "title": "Uncaught TypeError in async fetch rendering loop",
+      "symptom": "DOM rendering halts with Cannot read properties of undefined (reading 'title').",
+      "tried": "Added null checks inside document.getElementById().",
+      "rootCause": "JSON API response wrapped entries inside an object instead of returning a top-level array.",
+      "fix": "Updated parsing logic to extract response.data.entries before invoking Array.prototype.forEach().",
+      "lesson": "Validate payload structure or apply optional chaining before iterating fetched JSON data."
+    },
+    {
+      "id": "entry-010",
+      "timestamp": "2026-10-05T20:15:00Z",
+      "category": "JavaScript",
+      "title": "ESM import statement failure in Node/Mocha test runner",
+      "symptom": "SyntaxError: Cannot use import statement outside a module.",
+      "tried": "Converted import statements to require() statements.",
+      "rootCause": "package.json missing \"type\": \"module\" declaration for ECMAScript module resolution.",
+      "fix": "Added \"type\": \"module\" to package.json and ensured explicit .js file extensions on local relative imports.",
+      "lesson": "Explicitly specify module target settings in Node environments when using ES6 import/export syntax."
     }
   ]
 }
