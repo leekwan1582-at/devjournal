@@ -7,7 +7,7 @@
       "tried": "Checked loop bounds manually and printed buffer size.",
       "rootCause": "Indicator handle was re-initialized inside the event loop without resizing the array buffer.",
       "fix": "Moved handle initialization to OnInit() and applied ArraySetAsSeries() before accessing rates.",
-      "lesson": "## Always separate indicator handle allocation from the tick execution logic.",
+      "lesson": "Always separate indicator handle allocation from the tick execution logic.",
       "id": "entry-001",
       "timestamp": "2026-10-05T19:30:00Z"
     },

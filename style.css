@@ -1,49 +1,106 @@
-/* Custom mobile overrides */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+/* ── Category colour hook ─────────────────────────────
+   Any element with data-category exposes --category-color.
+   Cards, badges and the detail pane all read this one variable. */
+:root {
+  --cat-default: #6c757d;
 }
 
-.card {
+[data-category="MQL5"]           { --category-color: #0d6efd; }
+[data-category="Data Pipeline"]  { --category-color: #146c43; }
+[data-category="Backtesting"]    { --category-color: #6f42c1; }
+[data-category="Infrastructure"] { --category-color: #495057; }
+[data-category="Javascript"]     { --category-color: #8a5a00; }
+
+.badge-category {
+  background-color: var(--category-color, var(--cat-default));
+  color: #ffffff;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+/* Bottom padding clears the floating action button */
+.app-main {
+  padding-bottom: 6rem;
+}
+
+/* Keep the detail pane in view while the list scrolls (desktop split pane) */
+@media (min-width: 768px) {
+  #detailCard {
+    position: sticky;
+    top: 4.5rem;
+    max-height: calc(100vh - 5.5rem);
+    overflow-y: auto;
+  }
+}
+
+/* ── Entry cards ────────────────────────────────────── */
+.entry-card {
+  cursor: pointer;
+  border-left: 4px solid var(--category-color, var(--cat-default));
+  box-shadow: var(--bs-box-shadow-sm);
   transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
+@media (hover: hover) {
+  .entry-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--bs-box-shadow);
+  }
+}
+
 /* Highlight the entry currently open in the detail pane */
-.card.active-card {
+.entry-card.active-card {
   background-color: var(--bs-primary-bg-subtle);
-  box-shadow: inset 0 0 0 1px var(--bs-primary);
+  box-shadow: var(--bs-box-shadow-sm), inset 0 0 0 1px var(--bs-primary);
 }
 
 /* Visible focus ring for keyboard and programmatic focus */
-.card[role="button"]:focus-visible,
+.entry-card:focus-visible,
 #detailCard:focus,
 #listView:focus {
   outline: 2px solid var(--bs-primary);
   outline-offset: 2px;
 }
 
-.badge-mql5 {
-  background-color: #0d6efd;
-  color: #ffffff;
+/* Lets long titles wrap instead of pushing the action buttons off the card */
+.min-w-0 {
+  min-width: 0;
 }
 
-.badge-data-pipeline {
-  background-color: #20c997;
-  color: #ffffff;
+.entry-card .card-title-text {
+  overflow-wrap: anywhere;
 }
 
-.badge-backtesting {
-  background-color: #6f42c1;
-  color: #ffffff;
+/* Larger tap targets on touch devices */
+@media (pointer: coarse) {
+  .card-actions .btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
 }
 
-/* Ensure code samples in logs render cleanly */
+@media (prefers-reduced-motion: reduce) {
+  .entry-card,
+  .entry-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── Detail pane text ───────────────────────────────── */
+/* Preserves line breaks typed into the form textareas */
+.detail-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Monospace block for Symptom and Fix (stack traces, code) */
 .log-text-block {
-  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--bs-font-monospace);
   font-size: 0.875rem;
-  background-color: #f8f9fa;
+  background-color: var(--bs-tertiary-bg);
   padding: 0.5rem 0.75rem;
-  border-radius: 0.25rem;
-  border-left: 3px solid #0d6efd;
+  border-radius: var(--bs-border-radius-sm);
+  border-left: 3px solid var(--category-color, var(--cat-default));
 }
 
 /* ── Floating Action Button (Create Entry) ──────────── */
@@ -65,18 +122,17 @@ body {
 .console-container {
   margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--bs-border-color);
 }
 
 .console-output {
-  font-family: SFMono-Regular, Menlo, Monaco, Consolas,
-               "Liberation Mono", "Courier New", monospace;
+  font-family: var(--bs-font-monospace);
   font-size: 0.8rem;
   line-height: 1.5;
   background-color: #1e1e1e;
   color: #d4d4d4;
   padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: var(--bs-border-radius);
   max-height: 220px;
   overflow-y: auto;
   scrollbar-width: thin;

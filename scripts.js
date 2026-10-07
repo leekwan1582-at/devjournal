@@ -1,39 +1,169 @@
-// ── Application State ────────────────────────────────────────────────────
-let activeEntry = null;
-let editingEntry = null;
+// TraceDiary application logic: DOM, events, rendering, filters.
+// State and API calls live in data.js (getEntries, findEntryById, fetchEntries, createEntry, updateEntry, deleteEntry).
+
+// ── UI Constants ─────────────────────────────────────────────────────────
+const SEARCH_DEBOUNCE_MS = 250;
+const MAX_CONSOLE_LINES = 200;
+
+const FORM_FIELDS = [
+  "category",
+  "title",
+  "symptom",
+  "tried",
+  "rootCause",
+  "fix",
+  "lesson",
+];
+const SEARCH_FIELDS = ["title", "symptom", "fix"];
+
+const FIELD_LABELS = {
+  category: "Category",
+  title: "Title",
+  symptom: "Symptom",
+  tried: "Tried",
+  rootCause: "Root Cause",
+  fix: "Fix",
+  lesson: "Lesson",
+};
+
+const CATEGORY_ICONS = {
+  MQL5: "bi-cpu",
+  "Data Pipeline": "bi-diagram-3",
+  Backtesting: "bi-graph-up-arrow",
+  Infrastructure: "bi-hdd-network",
+  Javascript: "bi-filetype-js",
+};
+const DEFAULT_CATEGORY_ICON = "bi-journal-text";
+
+// Detail pane fields in display order; mono fields render as code blocks
+const DETAIL_FIELDS = [
+  { key: "symptom", icon: "bi-exclamation-triangle", mono: true },
+  { key: "tried", icon: "bi-tools" },
+  { key: "rootCause", icon: "bi-diagram-2" },
+  { key: "fix", icon: "bi-check2-circle", mono: true },
+  { key: "lesson", icon: "bi-bookmark-star" },
+];
+
+// Sort lookup: dates are ISO 8601 strings, so string comparison is chronological
+const SORTERS = {
+  "date-desc": (a, b) => String(b.timestamp).localeCompare(String(a.timestamp)),
+  "date-asc": (a, b) => String(a.timestamp).localeCompare(String(b.timestamp)),
+  "title-asc": (a, b) => String(a.title).localeCompare(String(b.title)),
+  "category-asc": (a, b) =>
+    String(a.category).localeCompare(String(b.category)),
+};
+
+const THEME_CYCLE = ["system", "light", "dark"];
+const THEME_ICONS = {
+  system: "bi-circle-half",
+  light: "bi-sun-fill",
+  dark: "bi-moon-stars-fill",
+};
+
+// ── UI State ─────────────────────────────────────────────────────────────
+let activeEntryId = null;
 let searchTerm = "";
 let categoryFilterValue = "ALL";
 let sortOption = "default";
 
 // ── DOM References ───────────────────────────────────────────────────────
-const consoleContainer = document.getElementById("console-container");
-const consoleOutput    = document.getElementById("console-output");
-const clearConsoleBtn  = document.getElementById("clearConsoleBtn");
-const listView         = document.getElementById("listView");
-const detailView       = document.getElementById("detailView");
-const detailCard       = document.getElementById("detailCard");
-const entriesList      = document.getElementById("entriesList");
+const listView = document.getElementById("listView");
+const detailView = document.getElementById("detailView");
+const detailCard = document.getElementById("detailCard");
+const detailHeaderTitle = document.getElementById("detailHeaderTitle");
+const detailActionGroup = document.getElementById("detailActionGroup");
+const detailContent = document.getElementById("detailContent");
+const entriesList = document.getElementById("entriesList");
+
+const searchInput = document.getElementById("searchInput");
+const categoryFilter = document.getElementById("categoryFilter");
+const sortSelect = document.getElementById("sortSelect");
+const refreshBtn = document.getElementById("refreshBtn");
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+
+const backToListBtn = document.getElementById("backToListBtn");
+const editEntryBtn = document.getElementById("editEntryBtn");
+const deleteEntryBtn = document.getElementById("deleteEntryBtn");
+const openFormBtn = document.getElementById("openFormBtn");
+
 const entryModalElement = document.getElementById("entryModal");
-const logForm          = document.getElementById("logForm");
-const searchInput      = document.getElementById("searchInput");
-const categoryFilter   = document.getElementById("categoryFilter");
-const sortSelect       = document.getElementById("sortSelect");
-const refreshBtn       = document.getElementById("refreshBtn");
+const entryModal = new bootstrap.Modal(entryModalElement);
+const formModalTitle = document.getElementById("formModalTitle");
+const logForm = document.getElementById("logForm");
+const entryIdInput = document.getElementById("entryId");
+const formCategorySelect = document.getElementById("category");
+const submitFormBtn = document.getElementById("submitFormBtn");
 
-// ── Console Output Panel ─────────────────────────────────────────────────
-const CONSOLE_MAX_LINES = 100;
+const consoleContainer = document.getElementById("console-container");
+const consoleOutput = document.getElementById("console-output");
+const clearConsoleBtn = document.getElementById("clearConsoleBtn");
 
-function logMessage(kind, text) {
-  if (!consoleOutput) return; // guard if HTML hasn't loaded yet
+const MOBILE_QUERY = window.matchMedia("(max-width: 767.98px)");
+const THEME_MEDIA = window.matchMedia("(prefers-color-scheme: dark)");
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function escapeHtml(value) {
+  const entities = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return String(value ?? "").replace(/[&<>"']/g, (char) => entities[char]);
+}
+
+function formatDate(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function isTypingTarget(element) {
+  return Boolean(
+    element.closest("input, textarea, select, [contenteditable='true']"),
+  );
+}
+
+function categoryBadgeHtml(category, extraClasses = "") {
+  const icon = CATEGORY_ICONS[category] ?? DEFAULT_CATEGORY_ICON;
+  return (
+    `<span class="badge badge-category ${extraClasses}">` +
+    `<i class="bi ${icon} me-1" aria-hidden="true"></i>${escapeHtml(category)}</span>`
+  );
+}
+
+function describeRequestError(error) {
+  if (error.unexpectedShape) {
+    return error.message;
+  }
+  if (error.response) {
+    return `Server responded with ${error.response.status} ${error.response.statusText || ""}`.trim();
+  }
+  if (error.code === "ECONNABORTED") {
+    return "The request timed out. Check that JSON Server is running.";
+  }
+  if (error.request) {
+    return `Cannot reach the API at ${API_URL}. Start JSON Server and try again.`;
+  }
+  return error.message || "Unknown error";
+}
+
+// ── Console Panel ────────────────────────────────────────────────────────
+
+function logMessage(level, message) {
   const line = document.createElement("div");
-  line.className = `console-line console-line--${kind}`;
-  line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
-
+  line.className = `console-line console-line--${level}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   consoleOutput.appendChild(line);
 
-  // FIFO trim — drop oldest lines once we exceed the cap
-  while (consoleOutput.childElementCount > CONSOLE_MAX_LINES) {
+  while (consoleOutput.childElementCount > MAX_CONSOLE_LINES) {
     consoleOutput.firstElementChild.remove();
   }
 
@@ -42,101 +172,117 @@ function logMessage(kind, text) {
 }
 
 function clearConsole() {
-  if (!consoleOutput) return;
-  consoleOutput.innerHTML = "";
+  consoleOutput.replaceChildren();
   consoleContainer.hidden = true;
 }
 
-// ── Dialog Helpers ───────────────────────────────────────────────────────
-function showToast(message, icon = "success") {
-  if (typeof Swal === "undefined") return;
+// ── Dialogs (SweetAlert2 with native fallbacks) ──────────────────────────
 
+function showToast(title, icon = "success") {
+  if (typeof Swal === "undefined") {
+    return;
+  }
   Swal.fire({
     toast: true,
     position: "top-end",
     icon,
-    title: message,
+    title,
     showConfirmButton: false,
-    timer: 2000,
+    timer: 2500,
     timerProgressBar: true,
   });
 }
 
-function showErrorDialog(title, message) {
-  if (typeof Swal === "undefined") return;
-
-  Swal.fire({
-    icon: "error",
-    title,
-    text: message,
-  });
-}
-
-function describeRequestError(error) {
-  if (error && error.response) {
-    const status = error.response.status;
-    if (status >= 500) return `Server error (${status}). Please try again later.`;
-    if (status === 404) return "The requested entry was not found (404).";
-    if (status >= 400) return `Request failed with status ${status}.`;
-    return `Unexpected response (${status}).`;
+function showErrorDialog(title, text) {
+  if (typeof Swal === "undefined") {
+    window.alert(`${title}\n${text}`);
+    return;
   }
-
-  if (error && error.code === "ECONNABORTED") return "The request timed out.";
-  if (error && error.request) return "Network error. Is the JSON Server running?";
-  return error && error.message ? error.message : "Unknown error.";
+  Swal.fire({ icon: "error", title, text });
 }
 
-// ── Date Formatter Helper (as specified in Wireframe) ────────────────────
-function formatDate(isoString) {
-  if (!isoString) return "";
-  const dateObj = new Date(isoString);
-  if (Number.isNaN(dateObj.getTime())) return "";
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `[${year}-${month}-${day}]`;
+async function confirmDelete(entryTitle) {
+  if (typeof Swal === "undefined") {
+    return window.confirm(`Delete "${entryTitle}"? This cannot be undone.`);
+  }
+  const result = await Swal.fire({
+    icon: "warning",
+    title: "Delete this entry?",
+    text: entryTitle,
+    showCancelButton: true,
+    confirmButtonText: "Delete",
+    confirmButtonColor: "#dc3545",
+  });
+  return result.isConfirmed;
 }
 
-// ── HTML Sanitization ────────────────────────────────────────────────────
-const HTML_ESCAPE_MAP = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
+// ── Theme ────────────────────────────────────────────────────────────────
 
-// Time: O(n), Space: O(n)
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
+function getStoredTheme() {
+  try {
+    const stored = localStorage.getItem("theme");
+    return THEME_CYCLE.includes(stored) ? stored : "system";
+  } catch (err) {
+    return "system";
+  }
 }
 
-// ── Mobile View-State Toggle Helper ──────────────────────────────────────
-const MOBILE_BREAKPOINT_PX = 768;
-const RESIZE_DEBOUNCE_MS = 150;
-const SEARCH_DEBOUNCE_MS = 150;
+function storeTheme(preference) {
+  try {
+    localStorage.setItem("theme", preference);
+  } catch (err) {
+    console.warn("Theme preference could not be saved:", err);
+  }
+}
 
-let isMobileLayout = null;
+// Held in memory so the toggle still cycles when localStorage is blocked
+let themePreference = getStoredTheme();
+
+function applyTheme(preference) {
+  const resolved =
+    preference === "system"
+      ? THEME_MEDIA.matches
+        ? "dark"
+        : "light"
+      : preference;
+  document.documentElement.setAttribute("data-bs-theme", resolved);
+
+  const label = `Theme: ${preference}. Switch theme.`;
+  themeToggleBtn.title = `Theme: ${preference}`;
+  themeToggleBtn.setAttribute("aria-label", label);
+  themeToggleBtn.querySelector("i").className = `bi ${THEME_ICONS[preference]}`;
+}
+
+function cycleTheme() {
+  themePreference =
+    THEME_CYCLE[
+      (THEME_CYCLE.indexOf(themePreference) + 1) % THEME_CYCLE.length
+    ];
+  storeTheme(themePreference);
+  applyTheme(themePreference);
+}
+
+// ── Responsive Layout (list and detail swap on mobile) ───────────────────
 
 function showDetailViewMobile() {
-  if (window.innerWidth < MOBILE_BREAKPOINT_PX) {
-    listView.classList.add("d-none");
-    detailView.classList.remove("d-none");
+  if (!MOBILE_QUERY.matches) {
+    return;
   }
+  listView.classList.add("d-none");
+  detailView.classList.remove("d-none");
+  window.scrollTo({ top: 0 });
 }
 
 function showListViewMobile() {
-  listView.classList.remove("d-none");
+  if (!MOBILE_QUERY.matches) {
+    return;
+  }
   detailView.classList.add("d-none");
+  listView.classList.remove("d-none");
 }
 
 function applyResponsiveLayout() {
-  const nextIsMobile = window.innerWidth < MOBILE_BREAKPOINT_PX;
-
-  if (nextIsMobile === isMobileLayout) return;
-  isMobileLayout = nextIsMobile;
-
-  if (nextIsMobile) {
+  if (MOBILE_QUERY.matches) {
     showListViewMobile();
   } else {
     listView.classList.remove("d-none");
@@ -144,548 +290,473 @@ function applyResponsiveLayout() {
   }
 }
 
-function focusDetailPane() {
-  if (isMobileLayout && detailCard !== null) {
-    detailCard.focus();
+// ── List Rendering ───────────────────────────────────────────────────────
+
+function renderListMessage(message, isError = false) {
+  const paragraph = document.createElement("p");
+  paragraph.className = `text-center my-4 ${isError ? "text-danger" : "text-body-secondary"}`;
+  if (isError) {
+    paragraph.setAttribute("role", "alert");
   }
+  paragraph.textContent = message;
+  entriesList.replaceChildren(paragraph);
 }
 
-function focusListViewPane() {
-  if (isMobileLayout && listView !== null) {
-    listView.focus();
-  }
+function createOption(value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  return option;
 }
 
-// ── List State Helpers ───────────────────────────────────────────────────
-function clearEntriesList() {
-  if (typeof bootstrap !== "undefined") {
-    entriesList.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((tooltipTrigger) => {
-      const tooltipInstance = bootstrap.Tooltip.getInstance(tooltipTrigger);
-      if (tooltipInstance) {
-        tooltipInstance.dispose();
-      }
-    });
-  }
-
-  entriesList.innerHTML = "";
-}
-
-function renderListMessage(message) {
-  clearEntriesList();
-
-  const placeholder = document.createElement("p");
-  placeholder.className = "text-muted text-center my-4";
-  placeholder.textContent = message;
-  entriesList.appendChild(placeholder);
-}
-
-// ── Filter and Sort ──────────────────────────────────────────────────────
 function populateCategoryOptions() {
-  const selectedCategory = categoryFilter.value;
-
-  categoryFilter.innerHTML = "";
-  const allOption = document.createElement("option");
-  allOption.value = "ALL";
-  allOption.textContent = "All Categories";
-  categoryFilter.appendChild(allOption);
-
-  const formCategorySelect = document.getElementById("category");
-  formCategorySelect.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Select Category";
+  const placeholder = createOption("", "Select Category");
   placeholder.disabled = true;
-  placeholder.selected = true;
-  formCategorySelect.appendChild(placeholder);
+  placeholder.defaultSelected = true; // form.reset() returns to the placeholder, not the first category
+
+  categoryFilter.replaceChildren(createOption("ALL", "All Categories"));
+  formCategorySelect.replaceChildren(placeholder);
 
   CATEGORY_OPTIONS.forEach((category) => {
-    const filterOption = document.createElement("option");
-    filterOption.value = category;
-    filterOption.textContent = category;
-    categoryFilter.appendChild(filterOption);
-
-    const formOption = document.createElement("option");
-    formOption.value = category;
-    formOption.textContent = category;
-    formCategorySelect.appendChild(formOption);
+    categoryFilter.append(createOption(category, category));
+    formCategorySelect.append(createOption(category, category));
   });
-
-  categoryFilter.value = CATEGORY_OPTIONS.includes(selectedCategory) ? selectedCategory : "ALL";
 }
 
-// Time: O(n log n), Space: O(n)
+// Time: O(n log n) for sorting, Space: O(n)
+function sortEntries(entries, sort) {
+  const sorted = [...entries];
+  return SORTERS[sort] ? sorted.sort(SORTERS[sort]) : sorted;
+}
+
+// Time: O(n * f) for n entries and f search fields, then O(n log n) sort
 function filterAndSortEntries(entries, options) {
   const query = options.searchTerm.trim().toLowerCase();
 
   const filtered = entries.filter((entry) => {
-    if (options.category !== "ALL" && entry.category !== options.category) return false;
-    if (query === "") return true;
-    return [entry.title, entry.symptom, entry.fix].some(
-      (field) => String(field).toLowerCase().includes(query)
+    if (options.category !== "ALL" && entry.category !== options.category) {
+      return false;
+    }
+    return (
+      query === "" ||
+      SEARCH_FIELDS.some((field) =>
+        String(entry[field] ?? "")
+          .toLowerCase()
+          .includes(query),
+      )
     );
   });
 
   return sortEntries(filtered, options.sort);
 }
 
-// Time: O(n log n), Space: O(n)
-function sortEntries(entries, sort) {
-  const sorted = [...entries];
+function createEntryCard(item, position, total) {
+  const card = document.createElement("div");
+  card.className = "card entry-card";
+  card.dataset.entryId = item.id;
+  card.dataset.category = item.category;
+  card.setAttribute("role", "button");
+  card.setAttribute("tabindex", "0");
+  card.setAttribute("aria-label", `Open entry: ${item.title}`);
 
-  if (sort === "date-desc") {
-    return sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  if (String(item.id) === String(activeEntryId)) {
+    card.classList.add("active-card");
   }
-  if (sort === "date-asc") {
-    return sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }
-  if (sort === "title-asc") {
-    return sorted.sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  }
-  if (sort === "category-asc") {
-    return sorted.sort((a, b) => String(a.category).localeCompare(String(b.category)));
-  }
-  return sorted;
+
+  card.innerHTML = `
+    <div class="card-body py-2">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div class="min-w-0">
+          <div class="mb-1">${categoryBadgeHtml(item.category)}</div>
+          <h3 class="h6 fw-bold mb-1 card-title-text">${escapeHtml(item.title)}</h3>
+          <div class="small text-body-secondary">Record ${position}/${total} · ${escapeHtml(formatDate(item.timestamp))}</div>
+        </div>
+        <div class="card-actions d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" aria-label="Edit entry: ${escapeHtml(item.title)}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+          <button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" aria-label="Delete entry: ${escapeHtml(item.title)}"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+          <i class="bi bi-chevron-right text-body-secondary d-md-none" aria-hidden="true"></i>
+        </div>
+      </div>
+    </div>`;
+
+  return card;
+}
+
+// Time: O(n), Space: O(n)
+function renderEntriesList(entries) {
+  const allEntries = getEntries();
+  const positions = new Map(
+    allEntries.map((entry, index) => [entry, index + 1]),
+  );
+  const cards = entries.map((item) =>
+    createEntryCard(item, positions.get(item), allEntries.length),
+  );
+  entriesList.replaceChildren(...cards);
 }
 
 function applyFilters() {
-  const allEntries = getEntries();
-
-  if (allEntries.length === 0) {
-    renderListMessage("No entries yet");
+  if (getEntries().length === 0) {
+    renderListMessage("No entries yet. Tap + to log your first bug.");
     return;
   }
 
-  const visibleEntries = filterAndSortEntries(allEntries, {
+  const visibleEntries = filterAndSortEntries(getEntries(), {
     searchTerm,
     category: categoryFilterValue,
     sort: sortOption,
   });
 
   if (visibleEntries.length === 0) {
-    renderListMessage("No matching entries");
+    renderListMessage("No entries match your search or filter.");
     return;
   }
 
   renderEntriesList(visibleEntries);
 }
 
-// ── Fetch and Render Log Entries ─────────────────────────────────────────
-async function refreshEntries() {
-  logMessage("info", `Fetching entries from ${API_URL}`);
-  renderListMessage("Loading…");
-
-  try {
-    await fetchEntries();
-
-    const n = getEntries().length;
-    logMessage("success", `Loaded ${n} ${n === 1 ? "entry" : "entries"}`);
-    populateCategoryOptions();
-    applyFilters();
-  } catch (err) {
-    if (err.unexpectedShape) {
-      logMessage("warn", err.message);
-      populateCategoryOptions();
-      applyFilters();
-      return;
-    }
-
-    logMessage("error", `Failed to load entries: ${err.message}`);
-    console.error("Failed to load entries:", err);
-    renderListMessage(describeRequestError(err));
-  }
+function clearFilters() {
+  searchTerm = "";
+  categoryFilterValue = "ALL";
+  searchInput.value = "";
+  categoryFilter.value = "ALL";
 }
 
-function renderEntriesList(entries) {
-  clearEntriesList();
+// ── Detail Rendering ─────────────────────────────────────────────────────
 
-  if (!Array.isArray(entries)) {
-    logMessage("warn", `renderEntriesList expected an array, got ${typeof entries}`);
-    renderListMessage("No entries yet");
-    return;
-  }
-
-  const allEntries = getEntries();
-
-  entries.forEach((item) => {
-    const card = document.createElement("div");
-    card.className = "card shadow-sm cursor-pointer border-start border-4 border-primary";
-    card.style.cursor = "pointer";
-    card.dataset.entryId = item.id;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-label", `View entry: ${item.title}`);
-
-    if (activeEntry !== null && item.id === activeEntry.id) {
-      card.classList.add("active-card");
-    }
-
-    card.innerHTML = `
-      <div class="card-body p-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <span class="badge bg-secondary">${escapeHtml(item.category)}</span>
-          <span class="small text-muted">Record ${allEntries.indexOf(item) + 1}/${allEntries.length} · ${formatDate(item.timestamp)}</span>
-        </div>
-        <h3 class="h6 card-title mb-1 fw-bold text-dark">${escapeHtml(item.title)}</h3>
-        <div class="d-flex justify-content-between align-items-center mt-2">
-          <span class="small text-primary">Tap to view details</span>
-          <div class="d-flex align-items-center gap-2">
-            <div class="card-actions d-flex align-items-center gap-1">
-              <button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" data-bs-toggle="tooltip" data-bs-title="Edit Entry" aria-label="Edit Entry"><i class="bi bi-pencil"></i></button>
-              <button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" data-bs-toggle="tooltip" data-bs-title="Delete Entry" aria-label="Delete Entry"><i class="bi bi-trash3"></i></button>
-            </div>
-            <i class="bi bi-chevron-right text-muted" aria-hidden="true"></i>
-          </div>
-        </div>
-      </div>
-    `;
-
-    card.addEventListener("click", (event) => {
-      if (event.target.closest(".card-actions")) return;
-      renderDetailedView(item);
-    });
-
-    card.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      if (event.target.closest(".card-actions")) return;
-      event.preventDefault();
-      renderDetailedView(item);
-    });
-
-    entriesList.appendChild(card);
-
-    card.querySelector(".card-delete-btn").addEventListener("click", () => {
-      handleDeleteEntry(item);
-    });
-
-    card.querySelector(".card-edit-btn").addEventListener("click", () => {
-      openEditForm(item);
-    });
-
-    // Buttons are created on the fly, so initialize their tooltips after insertion
-    if (typeof bootstrap !== "undefined") {
-      card.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((tooltipTrigger) => {
-        new bootstrap.Tooltip(tooltipTrigger);
-      });
-    }
+function highlightActiveCard() {
+  entriesList.querySelectorAll(".entry-card").forEach((card) => {
+    card.classList.toggle(
+      "active-card",
+      String(card.dataset.entryId) === String(activeEntryId),
+    );
   });
 }
 
-function renderDetailedView(entry) {
-  activeEntry = entry;
-  const detailContainer = document.getElementById("detailContent");
-  const actionGroup = document.getElementById("detailActionGroup");
-  const allEntries = getEntries();
-  const recordPosition = allEntries.indexOf(entry) + 1;
+// Fills the detail pane without changing navigation or focus
+function renderDetailContent(entry) {
+  activeEntryId = entry.id;
+  highlightActiveCard();
 
-  actionGroup.classList.remove("d-none");
-  detailContainer.innerHTML = `
-    <div class="mb-3">
-      <span class="text-muted small">Entry ID: ${escapeHtml(entry.id)}</span><br/>
-      <span class="badge bg-primary me-2">${escapeHtml(entry.category)}</span>
-      <span class="text-muted small">Timestamp: ${formatDate(entry.timestamp)}</span>
-      <span class="text-muted small ms-2">Record ${recordPosition}/${allEntries.length}</span>
+  const position = getEntries().indexOf(entry) + 1;
+
+  const fieldsHtml = DETAIL_FIELDS.map(
+    ({ key, icon, mono }) => `
+    <section class="mb-3">
+      <h3 class="h6 fw-bold mb-1"><i class="bi ${icon} me-2" aria-hidden="true"></i>${FIELD_LABELS[key]}</h3>
+      <p class="detail-text mb-0 ${mono ? "log-text-block" : "text-body-secondary"}">${escapeHtml(entry[key])}</p>
+    </section>`,
+  ).join("");
+
+  detailContent.dataset.category = entry.category;
+  detailContent.innerHTML = `
+    <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+      ${categoryBadgeHtml(entry.category)}
+      <span class="small text-body-secondary">Record ${position}/${getEntries().length} · ${escapeHtml(formatDate(entry.timestamp))}</span>
     </div>
-    <h2 class="h4 fw-bold mb-3">${formatDate(entry.timestamp)} ${escapeHtml(entry.title)}</h2>
+    <h2 class="h4 fw-bold mb-3">${escapeHtml(entry.title)}</h2>
+    ${fieldsHtml}`;
 
-    <div class="mb-2"><strong>Symptom:</strong><p class="text-secondary mb-1">${escapeHtml(entry.symptom)}</p></div>
-    <div class="mb-2"><strong>Tried:</strong><p class="text-secondary mb-1">${escapeHtml(entry.tried)}</p></div>
-    <div class="mb-2"><strong>Root Cause:</strong><p class="text-secondary mb-1">${escapeHtml(entry.rootCause)}</p></div>
-    <div class="mb-2"><strong>Fix:</strong><p class="text-secondary mb-1">${escapeHtml(entry.fix)}</p></div>
-    <div class="mb-2"><strong>Lesson:</strong><p class="text-secondary mb-1">${escapeHtml(entry.lesson)}</p></div>
-  `;
+  detailHeaderTitle.textContent = `Entry ${entry.id}`;
+  detailActionGroup.classList.remove("d-none");
+}
 
-  highlightActiveCard(entry.id);
+// Opens an entry from the list: render, switch panes on mobile, move focus
+function renderDetailedView(entry) {
+  renderDetailContent(entry);
   showDetailViewMobile();
-  focusDetailPane();
-}
-
-function highlightActiveCard(entryId) {
-  entriesList.querySelectorAll(".card").forEach((card) => {
-    card.classList.toggle("active-card", card.dataset.entryId === String(entryId));
-  });
-}
-
-// ── CRUD: Delete ─────────────────────────────────────────────────────────
-async function confirmDelete(entryLabel) {
-  if (typeof Swal === "undefined") {
-    return window.confirm(`Delete "${entryLabel}"? This cannot be undone.`);
+  if (MOBILE_QUERY.matches) {
+    detailCard.focus();
   }
-
-  const result = await Swal.fire({
-    title: "Delete entry?",
-    text: `"${entryLabel}" will be permanently removed.`,
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Delete",
-    confirmButtonColor: "#dc3545",
-    cancelButtonText: "Cancel",
-    reverseButtons: true,
-  });
-
-  return result.isConfirmed;
 }
 
 function resetDetailView() {
-  activeEntry = null;
-  highlightActiveCard(null);
-  document.getElementById("detailActionGroup").classList.add("d-none");
-  document.getElementById("detailContent").innerHTML = `
-    <p class="text-muted text-center my-5">Select an entry from the list to view full details.</p>
-  `;
+  activeEntryId = null;
+  highlightActiveCard();
+  delete detailContent.dataset.category;
+  detailHeaderTitle.textContent = "TraceDiary Entry";
+  detailActionGroup.classList.add("d-none");
+  detailContent.innerHTML =
+    '<p class="text-body-secondary text-center my-5">Select an entry from the list to view full details.</p>';
 }
 
-async function handleDeleteEntry(entry) {
-  const entryId = entry.id;
-
-  logMessage("info", `Deleting entry ${entryId}`);
-
-  const confirmed = await confirmDelete(entry.title);
-  if (!confirmed) {
-    logMessage("info", `Deleting entry cancel ${entryId}`);
+// Keeps the open detail pane in step after the data is reloaded
+function syncActiveEntry() {
+  if (activeEntryId === null) {
     return;
   }
+  const entry = findEntryById(activeEntryId);
+  if (entry) {
+    renderDetailContent(entry);
+  } else {
+    resetDetailView();
+    showListViewMobile();
+  }
+}
+
+// ── Loading ──────────────────────────────────────────────────────────────
+
+async function refreshEntries() {
+  renderListMessage("Loading entries…");
+  refreshBtn.disabled = true;
 
   try {
-    await deleteEntry(entryId);
-
-    resetDetailView();
+    await fetchEntries();
+    logMessage(
+      "success",
+      `GET ${API_URL}: loaded ${getEntries().length} entries`,
+    );
+    syncActiveEntry();
     applyFilters();
-
-    showListViewMobile();
-    logMessage("success", `Deleted entry ${entryId}`);
-    showToast("Entry deleted");
   } catch (err) {
-    logMessage("error", `Failed to delete entry: ${err.message}`);
-    console.error("Failed to delete entry:", err);
-    showErrorDialog("Delete failed", describeRequestError(err));
-    applyFilters();
+    logMessage("error", `GET ${API_URL} failed: ${describeRequestError(err)}`);
+    renderListMessage(describeRequestError(err), true);
+  } finally {
+    refreshBtn.disabled = false;
   }
 }
 
-// ── Entry Modal (Bootstrap when available, manual fallback otherwise) ────
-function getEntryModal() {
-  if (typeof bootstrap === "undefined" || typeof bootstrap.Modal === "undefined") return null;
-  return bootstrap.Modal.getOrCreateInstance(entryModalElement);
+// ── Form ─────────────────────────────────────────────────────────────────
+
+function collectEntryFormPayload() {
+  const payload = {};
+  FORM_FIELDS.forEach((name) => {
+    payload[name] = document.getElementById(name).value.trim();
+  });
+  return payload;
 }
 
-function showEntryModal() {
-  const entryModal = getEntryModal();
-  if (entryModal !== null) {
-    entryModal.show();
-    return;
-  }
-
-  entryModalElement.classList.add("show");
-  entryModalElement.style.display = "block";
-  entryModalElement.setAttribute("aria-modal", "true");
-  entryModalElement.removeAttribute("aria-hidden");
-  document.body.classList.add("modal-open");
-  document.body.style.overflow = "hidden";
-
-  const backdrop = document.createElement("div");
-  backdrop.className = "modal-backdrop fade show";
-  backdrop.id = "entryModalBackdrop";
-  document.body.appendChild(backdrop);
+function getMissingFields(payload) {
+  return FORM_FIELDS.filter((name) => payload[name] === "");
 }
 
-function hideEntryModal() {
-  const entryModal = getEntryModal();
-  if (entryModal !== null) {
-    entryModal.hide();
-    return;
-  }
-
-  entryModalElement.classList.remove("show");
-  entryModalElement.style.display = "none";
-  entryModalElement.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("modal-open");
-  document.body.style.overflow = "";
-
-  const backdrop = document.getElementById("entryModalBackdrop");
-  if (backdrop !== null) {
-    backdrop.remove();
-  }
-
-  resetEntryForm();
+function populateEntryForm(entry) {
+  entryIdInput.value = entry.id;
+  FORM_FIELDS.forEach((name) => {
+    document.getElementById(name).value = entry[name] ?? "";
+  });
 }
 
 function resetEntryForm() {
-  editingEntry = null;
   logForm.reset();
-  document.getElementById("entryId").value = "";
+  entryIdInput.value = "";
 }
 
-// ── CRUD: Edit ───────────────────────────────────────────────────────────
-function populateEntryForm(entry) {
-  document.getElementById("entryId").value = entry.id;
-  document.getElementById("category").value = entry.category;
-  document.getElementById("title").value = entry.title;
-  document.getElementById("symptom").value = entry.symptom;
-  document.getElementById("tried").value = entry.tried;
-  document.getElementById("rootCause").value = entry.rootCause;
-  document.getElementById("fix").value = entry.fix;
-  document.getElementById("lesson").value = entry.lesson;
-  document.getElementById("formModalTitle").textContent = "Edit Entry";
-}
-
-function collectEntryFormPayload() {
-  return {
-    category: document.getElementById("category").value.trim(),
-    title: document.getElementById("title").value.trim(),
-    symptom: document.getElementById("symptom").value.trim(),
-    tried: document.getElementById("tried").value.trim(),
-    rootCause: document.getElementById("rootCause").value.trim(),
-    fix: document.getElementById("fix").value.trim(),
-    lesson: document.getElementById("lesson").value.trim(),
-  };
-}
-
-function validateEntryPayload(payload) {
-  return Object.values(payload).every((value) => value.length > 0);
+function openCreateForm() {
+  resetEntryForm();
+  formModalTitle.textContent = "Create New Entry";
+  entryModal.show();
 }
 
 function openEditForm(entry) {
-  editingEntry = entry;
   populateEntryForm(entry);
-  showEntryModal();
-}
-
-// ── CRUD: Create ─────────────────────────────────────────────────────────
-function openCreateForm() {
-  resetEntryForm();
-  document.getElementById("formModalTitle").textContent = "Create New Entry";
-  showEntryModal();
+  formModalTitle.textContent = "Edit Entry";
+  entryModal.show();
 }
 
 async function handleEntryFormSubmit(event) {
   event.preventDefault();
 
-  const isCreate = editingEntry === null;
+  const editId = entryIdInput.value;
+  const isCreate = editId === "";
   const payload = collectEntryFormPayload();
+  const missingFields = getMissingFields(payload);
 
-  if (!validateEntryPayload(payload)) {
+  if (missingFields.length > 0) {
+    const names = missingFields.map((name) => FIELD_LABELS[name]).join(", ");
+    logMessage("warn", `Validation failed. Missing: ${names}`);
     if (typeof Swal !== "undefined") {
-      Swal.fire({ icon: "warning", title: "Missing fields", text: "All fields are required." });
+      Swal.fire({
+        icon: "warning",
+        title: "Missing fields",
+        text: `Fill in: ${names}`,
+      });
     }
     return;
   }
 
+  submitFormBtn.disabled = true; // blocks double submits while the request runs
+
   try {
+    const saved = isCreate
+      ? await createEntry(payload)
+      : await updateEntry(editId, payload);
+
+    entryModal.hide();
     if (isCreate) {
-      const createdEntry = await createEntry(payload);
-      hideEntryModal();
-      applyFilters();
-      logMessage("success", `Created entry ${createdEntry.id}`);
-      showToast("Entry created");
-      return;
+      clearFilters(); // make sure the new entry is visible in the list
+    }
+    applyFilters();
+    if (!isCreate) {
+      renderDetailContent(saved);
     }
 
-    const updatedEntryId = editingEntry.id;
-    const updatedEntry = await updateEntry(editingEntry.id, payload);
-
-    hideEntryModal();
-    applyFilters();
-    renderDetailedView(updatedEntry);
-    logMessage("success", `Updated entry ${updatedEntryId}`);
-    showToast("Entry updated");
+    logMessage("success", `${isCreate ? "POST" : "PUT"} ok: entry ${saved.id}`);
+    showToast(isCreate ? "Entry created" : "Entry updated");
   } catch (err) {
-    const action = isCreate ? "create" : "update";
-    logMessage("error", `Failed to ${action} entry: ${err.message}`);
-    console.error(`Failed to ${action} entry:`, err);
-    showErrorDialog(isCreate ? "Create failed" : "Update failed", describeRequestError(err));
+    const message = describeRequestError(err);
+    logMessage("error", `${isCreate ? "POST" : "PUT"} failed: ${message}`);
+    showErrorDialog(
+      isCreate ? "Could not create entry" : "Could not update entry",
+      message,
+    );
+  } finally {
+    submitFormBtn.disabled = false;
   }
 }
 
-// ── Keyboard Helpers ─────────────────────────────────────────────────────
-function isTypingTarget(target) {
-  if (!(target instanceof HTMLElement)) return false;
+// ── Delete ───────────────────────────────────────────────────────────────
 
-  const tagName = target.tagName;
-  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
+async function handleDeleteEntry(entry) {
+  const confirmed = await confirmDelete(entry.title);
+  if (!confirmed) {
+    logMessage("info", `Delete cancelled for entry ${entry.id}`);
+    return;
+  }
+
+  try {
+    await deleteEntry(entry.id);
+
+    if (String(entry.id) === String(activeEntryId)) {
+      resetDetailView();
+      showListViewMobile();
+    }
+    applyFilters();
+
+    logMessage("success", `DELETE ok: entry ${entry.id}`);
+    showToast("Entry deleted");
+  } catch (err) {
+    const message = describeRequestError(err);
+    logMessage("error", `DELETE failed: ${message}`);
+    showErrorDialog("Could not delete entry", message);
+  }
 }
 
-// ── DOM Event Listeners ──────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", () => {
-  refreshEntries();
-  applyResponsiveLayout();
+// ── Event Wiring ─────────────────────────────────────────────────────────
 
-  document.getElementById("backToListBtn").addEventListener("click", () => {
+function entryFromEvent(event) {
+  const card = event.target.closest(".entry-card");
+  return card ? findEntryById(card.dataset.entryId) : undefined;
+}
+
+function handleListClick(event) {
+  const entry = entryFromEvent(event);
+  if (!entry) {
+    return;
+  }
+  if (event.target.closest(".card-edit-btn")) {
+    openEditForm(entry);
+  } else if (event.target.closest(".card-delete-btn")) {
+    handleDeleteEntry(entry);
+  } else {
+    renderDetailedView(entry);
+  }
+}
+
+function handleListKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  // Let the Edit and Delete buttons handle their own keys
+  if (event.target.closest(".card-actions")) {
+    return;
+  }
+  const entry = entryFromEvent(event);
+  if (!entry) {
+    return;
+  }
+  event.preventDefault(); // stops Space from scrolling the page
+  renderDetailedView(entry);
+}
+
+function handleGlobalKeydown(event) {
+  // Escape inside dialogs belongs to the dialog, not the page
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    return;
+  }
+  if (entryModalElement.classList.contains("show")) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    resetDetailView();
     showListViewMobile();
-    focusListViewPane();
-  });
-  clearConsoleBtn.addEventListener("click", clearConsole);
+  } else if (
+    event.key === "n" &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !isTypingTarget(event.target)
+  ) {
+    openCreateForm();
+  }
+}
 
-  document.getElementById("deleteEntryBtn").addEventListener("click", () => {
-    if (activeEntry !== null) {
-      handleDeleteEntry(activeEntry);
-    }
-  });
-
-  document.getElementById("editEntryBtn").addEventListener("click", () => {
-    if (activeEntry !== null) {
-      openEditForm(activeEntry);
-    }
-  });
-
-  document.getElementById("openFormBtn").addEventListener("click", openCreateForm);
-
-  // Search / category / sort / refresh controls
+document.addEventListener("DOMContentLoaded", () => {
   let searchTimeoutId = null;
+
+  applyTheme(themePreference);
+  populateCategoryOptions();
+  applyResponsiveLayout();
+  refreshEntries();
+
+  // List: one delegated pair of listeners covers every card
+  entriesList.addEventListener("click", handleListClick);
+  entriesList.addEventListener("keydown", handleListKeydown);
+
+  // Controls
   searchInput.addEventListener("input", () => {
-    if (searchTimeoutId !== null) {
-      clearTimeout(searchTimeoutId);
-    }
+    clearTimeout(searchTimeoutId);
     searchTimeoutId = setTimeout(() => {
       searchTerm = searchInput.value;
       applyFilters();
     }, SEARCH_DEBOUNCE_MS);
   });
+
   categoryFilter.addEventListener("change", () => {
     categoryFilterValue = categoryFilter.value;
     applyFilters();
   });
+
   sortSelect.addEventListener("change", () => {
     sortOption = sortSelect.value;
     applyFilters();
   });
-  refreshBtn.addEventListener("click", refreshEntries);
 
+  refreshBtn.addEventListener("click", refreshEntries);
+  themeToggleBtn.addEventListener("click", cycleTheme);
+  clearConsoleBtn.addEventListener("click", clearConsole);
+
+  // Detail pane
+  backToListBtn.addEventListener("click", () => {
+    showListViewMobile();
+    listView.focus();
+  });
+
+  editEntryBtn.addEventListener("click", () => {
+    const entry = findEntryById(activeEntryId);
+    if (entry) {
+      openEditForm(entry);
+    }
+  });
+
+  deleteEntryBtn.addEventListener("click", () => {
+    const entry = findEntryById(activeEntryId);
+    if (entry) {
+      handleDeleteEntry(entry);
+    }
+  });
+
+  // Form
+  openFormBtn.addEventListener("click", openCreateForm);
   logForm.addEventListener("submit", handleEntryFormSubmit);
   entryModalElement.addEventListener("hidden.bs.modal", resetEntryForm);
 
-  // Manual dismiss handlers cover the case where Bootstrap JS is unavailable
-  entryModalElement.addEventListener("click", (event) => {
-    if (event.target.closest('[data-bs-dismiss="modal"]')) {
-      hideEntryModal();
+  // Page-level
+  document.addEventListener("keydown", handleGlobalKeydown);
+  MOBILE_QUERY.addEventListener("change", applyResponsiveLayout);
+  THEME_MEDIA.addEventListener("change", () => {
+    if (themePreference === "system") {
+      applyTheme("system");
     }
-  });
-  document.addEventListener("click", (event) => {
-    if (event.target.id === "entryModalBackdrop") {
-      hideEntryModal();
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      if (entryModalElement.classList.contains("show")) {
-        hideEntryModal();
-      } else {
-        resetDetailView();
-        showListViewMobile();
-      }
-      return;
-    }
-
-    if (event.key === "n" && !entryModalElement.classList.contains("show") && !isTypingTarget(event.target)) {
-      openCreateForm();
-    }
-  });
-
-  // Responsive window resize watch (debounced, handles both grow and shrink)
-  let resizeTimeoutId = null;
-  window.addEventListener("resize", () => {
-    if (resizeTimeoutId !== null) {
-      clearTimeout(resizeTimeoutId);
-    }
-    resizeTimeoutId = setTimeout(applyResponsiveLayout, RESIZE_DEBOUNCE_MS);
   });
 });

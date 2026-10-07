@@ -2,18 +2,15 @@
 const API_URL = document.querySelector('meta[name="api-url"]')?.content
   || "http://localhost:3000/entries";
 
-// Single source of truth for category options (form and filter are built from this)
+// Interim single source of truth for category options
 const CATEGORY_OPTIONS = ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure", "Javascript"];
-
-// Axios instance with a timeout so a hung server surfaces as a handled error
-const api = axios.create({ timeout: 8000 });
 
 // ── Application State ────────────────────────────────────────────────────
 let entriesState = [];
 
 // ── Data Layer ───────────────────────────────────────────────────────────
-// Owns the entries array. All reads go through getEntries() because
-// fetchEntries() replaces the array, so callers must not hold on to it.
+// Owns the entries array; all reads go through getEntries() so callers never
+// capture a stale reference when the store is replaced.
 
 function getEntries() {
   return entriesState;
@@ -24,43 +21,36 @@ function findEntryIndexById(id) {
   return entriesState.findIndex((entry) => String(entry.id) === String(id));
 }
 
-// Time: O(n), Space: O(1)
-function findEntryById(id) {
-  const index = findEntryIndexById(id);
-  return index === -1 ? undefined : entriesState[index];
-}
-
 async function fetchEntries() {
-  const { data } = await api.get(API_URL);
+  const response = await axios.get(API_URL);
 
-  if (!Array.isArray(data)) {
-    entriesState = [];
-    const shapeError = new Error(`Unexpected response shape (expected array, got ${typeof data})`);
+  if (!Array.isArray(response.data)) {
+    entriesState.length = 0;
+    const shapeError = new Error(`Unexpected response shape (expected array, got ${typeof response.data})`);
     shapeError.unexpectedShape = true;
     throw shapeError;
   }
 
-  entriesState = data;
+  entriesState.length = 0;
+  entriesState.push(...response.data);
   return entriesState;
 }
 
 async function createEntry(payload) {
-  const response = await api.post(API_URL, { ...payload, timestamp: new Date().toISOString() });
+  const response = await axios.post(API_URL, { ...payload, timestamp: new Date().toISOString() });
   entriesState.push(response.data);
   return response.data;
 }
 
 async function updateEntry(id, payload) {
   const index = findEntryIndexById(id);
-  const existing = index !== -1 ? entriesState[index] : undefined;
+  const body = { ...payload, id };
 
-  // Reuse the stored id and timestamp so PUT keeps the original id type and creation time
-  const body = { ...payload, id: existing ? existing.id : id };
-  if (existing?.timestamp) {
-    body.timestamp = existing.timestamp;
+  if (index !== -1 && entriesState[index].timestamp) {
+    body.timestamp = entriesState[index].timestamp;
   }
 
-  const response = await api.put(`${API_URL}/${body.id}`, body);
+  const response = await axios.put(`${API_URL}/${id}`, body);
 
   if (index !== -1) {
     entriesState[index] = response.data;
@@ -70,7 +60,7 @@ async function updateEntry(id, payload) {
 }
 
 async function deleteEntry(id) {
-  await api.delete(`${API_URL}/${id}`);
+  await axios.delete(`${API_URL}/${id}`);
 
   const index = findEntryIndexById(id);
   if (index !== -1) {
