@@ -1,24 +1,17 @@
-// ── Configuration ────────────────────────────────────
-const API_URL = document.querySelector('meta[name="api-url"]')?.content
-  || "http://localhost:3000/entries";
-
-// Interim single source of truth for category options
-const CATEGORY_OPTIONS = ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure", "Javascript"];
-
-// ── Application State ────────────────────────────────
-let entriesState = [];
+// ── Application State ────────────────────────────────────────────────────
 let activeEntry = null;
 let editingEntry = null;
 let searchTerm = "";
 let categoryFilterValue = "ALL";
 let sortOption = "default";
 
-// ── DOM References ───────────────────────────────────
+// ── DOM References ───────────────────────────────────────────────────────
 const consoleContainer = document.getElementById("console-container");
 const consoleOutput    = document.getElementById("console-output");
 const clearConsoleBtn  = document.getElementById("clearConsoleBtn");
 const listView         = document.getElementById("listView");
 const detailView       = document.getElementById("detailView");
+const detailCard       = document.getElementById("detailCard");
 const entriesList      = document.getElementById("entriesList");
 const entryModalElement = document.getElementById("entryModal");
 const logForm          = document.getElementById("logForm");
@@ -27,7 +20,7 @@ const categoryFilter   = document.getElementById("categoryFilter");
 const sortSelect       = document.getElementById("sortSelect");
 const refreshBtn       = document.getElementById("refreshBtn");
 
-// ── Console Output Panel ─────────────────────────────
+// ── Console Output Panel ─────────────────────────────────────────────────
 const CONSOLE_MAX_LINES = 100;
 
 function logMessage(kind, text) {
@@ -54,7 +47,7 @@ function clearConsole() {
   consoleContainer.hidden = true;
 }
 
-// ── Dialog Helpers ───────────────────────────────────
+// ── Dialog Helpers ───────────────────────────────────────────────────────
 function showToast(message, icon = "success") {
   if (typeof Swal === "undefined") return;
 
@@ -93,7 +86,7 @@ function describeRequestError(error) {
   return error && error.message ? error.message : "Unknown error.";
 }
 
-// ── Date Formatter Helper (as specified in Wireframe) ─
+// ── Date Formatter Helper (as specified in Wireframe) ────────────────────
 function formatDate(isoString) {
   if (!isoString) return "";
   const dateObj = new Date(isoString);
@@ -104,7 +97,7 @@ function formatDate(isoString) {
   return `[${year}-${month}-${day}]`;
 }
 
-// ── HTML Sanitization ────────────────────────────────
+// ── HTML Sanitization ────────────────────────────────────────────────────
 const HTML_ESCAPE_MAP = {
   "&": "&amp;",
   "<": "&lt;",
@@ -118,7 +111,7 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
 }
 
-// ── Mobile View-State Toggle Helper ──────────────────
+// ── Mobile View-State Toggle Helper ──────────────────────────────────────
 const MOBILE_BREAKPOINT_PX = 768;
 const RESIZE_DEBOUNCE_MS = 150;
 const SEARCH_DEBOUNCE_MS = 150;
@@ -151,7 +144,19 @@ function applyResponsiveLayout() {
   }
 }
 
-// ── List State Helpers ───────────────────────────────
+function focusDetailPane() {
+  if (isMobileLayout && detailCard !== null) {
+    detailCard.focus();
+  }
+}
+
+function focusListViewPane() {
+  if (isMobileLayout && listView !== null) {
+    listView.focus();
+  }
+}
+
+// ── List State Helpers ───────────────────────────────────────────────────
 function clearEntriesList() {
   if (typeof bootstrap !== "undefined") {
     entriesList.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((tooltipTrigger) => {
@@ -174,7 +179,7 @@ function renderListMessage(message) {
   entriesList.appendChild(placeholder);
 }
 
-// ── Filter and Sort ──────────────────────────────────
+// ── Filter and Sort ──────────────────────────────────────────────────────
 function populateCategoryOptions() {
   const selectedCategory = categoryFilter.value;
 
@@ -243,12 +248,14 @@ function sortEntries(entries, sort) {
 }
 
 function applyFilters() {
-  if (entriesState.length === 0) {
+  const allEntries = getEntries();
+
+  if (allEntries.length === 0) {
     renderListMessage("No entries yet");
     return;
   }
 
-  const visibleEntries = filterAndSortEntries(entriesState, {
+  const visibleEntries = filterAndSortEntries(allEntries, {
     searchTerm,
     category: categoryFilterValue,
     sort: sortOption,
@@ -262,26 +269,26 @@ function applyFilters() {
   renderEntriesList(visibleEntries);
 }
 
-// ── Fetch and Render Log Entries ─────────────────────
-async function fetchEntries() {
+// ── Fetch and Render Log Entries ─────────────────────────────────────────
+async function refreshEntries() {
   logMessage("info", `Fetching entries from ${API_URL}`);
   renderListMessage("Loading…");
 
   try {
-    const response = await axios.get(API_URL);
+    await fetchEntries();
 
-    if (!Array.isArray(response.data)) {
-      logMessage("warn", `Unexpected response shape (expected array, got ${typeof response.data})`);
-      entriesState = [];
-    } else {
-      entriesState = response.data;
-      const n = entriesState.length;
-      logMessage("success", `Loaded ${n} ${n === 1 ? "entry" : "entries"}`);
-    }
-
+    const n = getEntries().length;
+    logMessage("success", `Loaded ${n} ${n === 1 ? "entry" : "entries"}`);
     populateCategoryOptions();
     applyFilters();
   } catch (err) {
+    if (err.unexpectedShape) {
+      logMessage("warn", err.message);
+      populateCategoryOptions();
+      applyFilters();
+      return;
+    }
+
     logMessage("error", `Failed to load entries: ${err.message}`);
     console.error("Failed to load entries:", err);
     renderListMessage(describeRequestError(err));
@@ -297,11 +304,16 @@ function renderEntriesList(entries) {
     return;
   }
 
+  const allEntries = getEntries();
+
   entries.forEach((item) => {
     const card = document.createElement("div");
     card.className = "card shadow-sm cursor-pointer border-start border-4 border-primary";
     card.style.cursor = "pointer";
     card.dataset.entryId = item.id;
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `View entry: ${item.title}`);
 
     if (activeEntry !== null && item.id === activeEntry.id) {
       card.classList.add("active-card");
@@ -311,7 +323,7 @@ function renderEntriesList(entries) {
       <div class="card-body p-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <span class="badge bg-secondary">${escapeHtml(item.category)}</span>
-          <span class="small text-muted">Record ${entriesState.indexOf(item) + 1}/${entriesState.length} · ${formatDate(item.timestamp)}</span>
+          <span class="small text-muted">Record ${allEntries.indexOf(item) + 1}/${allEntries.length} · ${formatDate(item.timestamp)}</span>
         </div>
         <h3 class="h6 card-title mb-1 fw-bold text-dark">${escapeHtml(item.title)}</h3>
         <div class="d-flex justify-content-between align-items-center mt-2">
@@ -321,7 +333,7 @@ function renderEntriesList(entries) {
               <button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" data-bs-toggle="tooltip" data-bs-title="Edit Entry" aria-label="Edit Entry"><i class="bi bi-pencil"></i></button>
               <button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" data-bs-toggle="tooltip" data-bs-title="Delete Entry" aria-label="Delete Entry"><i class="bi bi-trash3"></i></button>
             </div>
-            <i class="bi bi-chevron-right text-muted"></i>
+            <i class="bi bi-chevron-right text-muted" aria-hidden="true"></i>
           </div>
         </div>
       </div>
@@ -331,10 +343,18 @@ function renderEntriesList(entries) {
       if (event.target.closest(".card-actions")) return;
       renderDetailedView(item);
     });
+
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target.closest(".card-actions")) return;
+      event.preventDefault();
+      renderDetailedView(item);
+    });
+
     entriesList.appendChild(card);
 
     card.querySelector(".card-delete-btn").addEventListener("click", () => {
-      deleteEntry(item);
+      handleDeleteEntry(item);
     });
 
     card.querySelector(".card-edit-btn").addEventListener("click", () => {
@@ -354,7 +374,8 @@ function renderDetailedView(entry) {
   activeEntry = entry;
   const detailContainer = document.getElementById("detailContent");
   const actionGroup = document.getElementById("detailActionGroup");
-  const recordPosition = entriesState.indexOf(entry) + 1;
+  const allEntries = getEntries();
+  const recordPosition = allEntries.indexOf(entry) + 1;
 
   actionGroup.classList.remove("d-none");
   detailContainer.innerHTML = `
@@ -362,7 +383,7 @@ function renderDetailedView(entry) {
       <span class="text-muted small">Entry ID: ${escapeHtml(entry.id)}</span><br/>
       <span class="badge bg-primary me-2">${escapeHtml(entry.category)}</span>
       <span class="text-muted small">Timestamp: ${formatDate(entry.timestamp)}</span>
-      <span class="text-muted small ms-2">Record ${recordPosition}/${entriesState.length}</span>
+      <span class="text-muted small ms-2">Record ${recordPosition}/${allEntries.length}</span>
     </div>
     <h2 class="h4 fw-bold mb-3">${formatDate(entry.timestamp)} ${escapeHtml(entry.title)}</h2>
 
@@ -375,6 +396,7 @@ function renderDetailedView(entry) {
 
   highlightActiveCard(entry.id);
   showDetailViewMobile();
+  focusDetailPane();
 }
 
 function highlightActiveCard(entryId) {
@@ -383,7 +405,7 @@ function highlightActiveCard(entryId) {
   });
 }
 
-// ── CRUD: Delete ─────────────────────────────────────
+// ── CRUD: Delete ─────────────────────────────────────────────────────────
 async function confirmDelete(entryLabel) {
   if (typeof Swal === "undefined") {
     return window.confirm(`Delete "${entryLabel}"? This cannot be undone.`);
@@ -412,7 +434,7 @@ function resetDetailView() {
   `;
 }
 
-async function deleteEntry(entry) {
+async function handleDeleteEntry(entry) {
   const entryId = entry.id;
 
   logMessage("info", `Deleting entry ${entryId}`);
@@ -424,12 +446,8 @@ async function deleteEntry(entry) {
   }
 
   try {
-    await axios.delete(`${API_URL}/${entryId}`);
+    await deleteEntry(entryId);
 
-    const index = entriesState.indexOf(entry);
-    if (index !== -1) {
-      entriesState.splice(index, 1);
-    }
     resetDetailView();
     applyFilters();
 
@@ -444,7 +462,7 @@ async function deleteEntry(entry) {
   }
 }
 
-// ── Entry Modal (Bootstrap when available, manual fallback otherwise) ─
+// ── Entry Modal (Bootstrap when available, manual fallback otherwise) ────
 function getEntryModal() {
   if (typeof bootstrap === "undefined" || typeof bootstrap.Modal === "undefined") return null;
   return bootstrap.Modal.getOrCreateInstance(entryModalElement);
@@ -497,7 +515,7 @@ function resetEntryForm() {
   document.getElementById("entryId").value = "";
 }
 
-// ── CRUD: Edit ───────────────────────────────────────
+// ── CRUD: Edit ───────────────────────────────────────────────────────────
 function populateEntryForm(entry) {
   document.getElementById("entryId").value = entry.id;
   document.getElementById("category").value = entry.category;
@@ -532,24 +550,7 @@ function openEditForm(entry) {
   showEntryModal();
 }
 
-async function updateEntry(entry, payload) {
-  const body = { ...payload, id: entry.id };
-
-  if (entry.timestamp) {
-    body.timestamp = entry.timestamp;
-  }
-
-  const response = await axios.put(`${API_URL}/${entry.id}`, body);
-  return response.data;
-}
-
-// ── CRUD: Create ─────────────────────────────────────
-async function createEntry(payload) {
-  const body = { ...payload, timestamp: new Date().toISOString() };
-  const response = await axios.post(API_URL, body);
-  return response.data;
-}
-
+// ── CRUD: Create ─────────────────────────────────────────────────────────
 function openCreateForm() {
   resetEntryForm();
   document.getElementById("formModalTitle").textContent = "Create New Entry";
@@ -572,7 +573,6 @@ async function handleEntryFormSubmit(event) {
   try {
     if (isCreate) {
       const createdEntry = await createEntry(payload);
-      entriesState.push(createdEntry);
       hideEntryModal();
       applyFilters();
       logMessage("success", `Created entry ${createdEntry.id}`);
@@ -581,11 +581,7 @@ async function handleEntryFormSubmit(event) {
     }
 
     const updatedEntryId = editingEntry.id;
-    const updatedEntry = await updateEntry(editingEntry, payload);
-    const index = entriesState.indexOf(editingEntry);
-    if (index !== -1) {
-      entriesState[index] = updatedEntry;
-    }
+    const updatedEntry = await updateEntry(editingEntry.id, payload);
 
     hideEntryModal();
     applyFilters();
@@ -600,7 +596,7 @@ async function handleEntryFormSubmit(event) {
   }
 }
 
-// ── Keyboard Helpers ─────────────────────────────────
+// ── Keyboard Helpers ─────────────────────────────────────────────────────
 function isTypingTarget(target) {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -608,17 +604,20 @@ function isTypingTarget(target) {
   return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
 }
 
-// ── DOM Event Listeners ──────────────────────────────
+// ── DOM Event Listeners ──────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  fetchEntries();
+  refreshEntries();
   applyResponsiveLayout();
 
-  document.getElementById("backToListBtn").addEventListener("click", showListViewMobile);
+  document.getElementById("backToListBtn").addEventListener("click", () => {
+    showListViewMobile();
+    focusListViewPane();
+  });
   clearConsoleBtn.addEventListener("click", clearConsole);
 
   document.getElementById("deleteEntryBtn").addEventListener("click", () => {
     if (activeEntry !== null) {
-      deleteEntry(activeEntry);
+      handleDeleteEntry(activeEntry);
     }
   });
 
@@ -649,7 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sortOption = sortSelect.value;
     applyFilters();
   });
-  refreshBtn.addEventListener("click", fetchEntries);
+  refreshBtn.addEventListener("click", refreshEntries);
 
   logForm.addEventListener("submit", handleEntryFormSubmit);
   entryModalElement.addEventListener("hidden.bs.modal", resetEntryForm);

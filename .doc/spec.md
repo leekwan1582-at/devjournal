@@ -14,14 +14,17 @@ Workflow: create the GitHub repository first, clone it into WSL, and open it in 
 
 ```
 TraceDiary/
-├── index.html          # Main structural entry point
-├── style.css           # Custom CSS overrides not handled by Bootstrap
-├── scripts.js          # Application logic (DOM, events, CRUD, API calls)
-├── data.js             # Data layer (state array, API endpoint configuration)
-├── db.json             # JSON Server data file, shape defined in section 5
-├── entries.schema.json # Design-time JSON Schema, defined in section 5
-└── README.md           # Project overview, setup steps, and data dictionary for the assessor
+├── index.html              # Main structural entry point
+├── style.css               # Custom CSS overrides not handled by Bootstrap
+├── scripts.js              # Application logic (DOM, events, rendering, filters)
+├── data.js                 # Data layer (state array, API config, CRUD functions)
+├── data/
+│   └── entries.json        # JSON Server data file, shape defined in section 5
+├── package.json            # JSON Server dependency and the mock-api script
+└── README.md               # Project overview, setup steps, and data dictionary
 ```
+
+The JSON Schema in section 5.1 is a design-time blueprint; the runtime data file is `data/entries.json`.
 
 ---
 
@@ -39,7 +42,7 @@ Use Bootstrap form controls (`form-control`, `mb-3`) for the entry fields:
 
 | Field | Control |
 |---|---|
-| Category | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure) |
+| Category | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure, Javascript) |
 | Title | text input |
 | Symptom | textarea |
 | Tried | textarea |
@@ -51,7 +54,7 @@ The six core fields are Title, Symptom, Tried, Root Cause, Fix, and Lesson. Cate
 
 ### 3.3 Display
 
-Render saved logs as Bootstrap Cards. Each card must include an **Edit** button and a **Delete** button.
+Render saved logs as Bootstrap Cards. Each card must include an **Edit** button and a **Delete** button. Cards are keyboard-focusable and open the detail view with `Enter` or `Space` (section 3.5).
 
 ### 3.4 Icons
 
@@ -119,29 +122,44 @@ Alternatives: `bi-person-badge`, `bi-person-gear`.
 | Entry tap indicator (mobile list) | `bi-chevron-right` |
 | Back to list (mobile detail) | `bi-arrow-left` |
 
+### 3.5 Accessibility
+
+The interface is keyboard-operable and exposes its state to assistive technology:
+
+| Area | Behavior |
+|---|---|
+| Entry cards | Rendered with `role="button"` and `tabindex="0"`, plus an `aria-label` that names the entry. |
+| Card activation | `Enter` and `Space` open the detail view; the default `Space` scroll is suppressed. |
+| Icon controls | Every icon-only button carries an `aria-label` (Create, Search, Edit, Delete, Back, Refresh, Clear console). Purely decorative icons use `aria-hidden="true"`. |
+| Focus management | Selecting an entry in the mobile layout moves focus to the detail pane; the Back button returns focus to the list pane. |
+| Visible focus | Cards and the detail pane show a `:focus-visible` / `:focus` outline. |
+| Form controls | Search, category, and sort use native controls with associated labels. |
+| Status messages | The console log uses `role="status"` and `aria-live="polite"`. |
+
 ---
 
 ## 4. JavaScript Implementation (CRUD & API)
 
 The assessment grades vanilla JavaScript proficiency. Build Create, Read, Update, and Delete while meeting these milestones:
 
-1. **State management (arrays and objects):** Define the entries array in `data.js`. Each entry is a JavaScript object with the fields in section 5.
+1. **State management (arrays and objects):** Define the entries array (`entriesState`) and the API endpoint configuration in `data.js`, which acts as the data layer. Each entry is a JavaScript object with the fields in section 5. The data layer owns the array and exposes `getEntries()` plus the CRUD functions `fetchEntries()`, `createEntry()`, `updateEntry()`, and `deleteEntry()`. UI state (active entry, edit target, search term, active filter, and sort order) lives in `scripts.js`, where filtering, sorting, and search are also applied.
 2. **DOM manipulation and events:** Use `document.addEventListener("DOMContentLoaded", ...)` as the entry point. Attach a `submit` listener to the form. Modify at least three properties across two DOM elements (for example text content, a class, or hiding/showing an element).
 3. **Structured logic:**
    - at least one loop (rendering entries)
    - at least one conditional branch (validating that required fields are not empty)
    - custom functions where the return value of one is passed to another
 4. **Asynchronous operations (AJAX):** Use Axios to communicate with an external service. Implement at least one `GET` request to retrieve logs and at least one `POST`, `PUT`, or `PATCH` request to save or update them.
+5. **Accessibility and structure:** Provide keyboard-operable entry cards and ARIA-labelled icon controls (section 3.5). Application logic is organized in `scripts.js` (DOM, events, CRUD calls), with state and API configuration in `data.js`.
 
-**API:** JSON Server serves `db.json` at `http://localhost:3000/entries` (endpoint configured in `data.js`).
+**API:** JSON Server serves `data/entries.json` at `http://localhost:3000/entries`. The endpoint is configured in `data.js` from the `<meta name="api-url">` tag in `index.html`, defaulting to `http://localhost:3000/entries`.
 
 ---
 
 ## 5. Data Model
 
-### 5.1 JSON Schema (`entries.schema.json`)
+### 5.1 JSON Schema
 
-Design-time blueprint of the dataset. It documents the structure without relying on runtime data.
+Design-time blueprint of the dataset. It documents the structure without relying on runtime data; the runtime file is `data/entries.json`.
 
 ```json
 {
@@ -169,7 +187,7 @@ Design-time blueprint of the dataset. It documents the structure without relying
           "category": {
             "type": "string",
             "description": "The technology stack, domain, or environment related to the issue.",
-            "enum": ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure"]
+            "enum": ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure", "Javascript"]
           },
           "title": {
             "type": "string",
@@ -218,7 +236,7 @@ Design-time blueprint of the dataset. It documents the structure without relying
 |---|---|---|---|---|
 | `id` | String | Unique alphanumeric string | Yes | Unique identifier for the entry. |
 | `timestamp` | String | ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`) | Yes | When the record was created. |
-| `category` | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure` | Yes | Technical domain of the log. |
+| `category` | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript` | Yes | Technical domain of the log. |
 | `title` | String | Plain text | Yes | Short title describing the scope of the log. |
 | `symptom` | String | Plain text | Yes | Observable errors, console output, or crashes. |
 | `tried` | String | Plain text | Yes | Actions taken before the cause was found. |

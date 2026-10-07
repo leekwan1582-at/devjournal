@@ -8,8 +8,11 @@ files directly and opening `index.html`.
 
 - `index.html` — markup; Bootstrap 5.3.3, Bootstrap Icons, and axios loaded from CDN.
   Early inline script sets `data-bs-theme` from `localStorage` to avoid theme flash.
-- `scripts.js` — all app logic (fetch, list/detail render, mobile toggle, console panel).
-  Loaded as a plain global script, not a module.
+- `data.js` — data layer: config (`API_URL`, `CATEGORY_OPTIONS`), the `entriesState`
+  array, and the CRUD functions (`getEntries`, `fetchEntries`, `createEntry`, `updateEntry`,
+  `deleteEntry`). Loaded as a plain global script, not a module.
+- `scripts.js` — app logic: DOM rendering, events, mobile toggle, filters/sort/search, console panel.
+  Loaded as a plain global script after `data.js`.
 - `style.css` — custom overrides plus the console output panel styles.
 - `data/entries.json` — the data store. JSON Server reads and writes this file.
 - `.doc/spec.md` — requirements + JSON schema. `.doc/enhancemet-1.md` (note the typo in
@@ -26,17 +29,17 @@ files directly and opening `index.html`.
 
 - Entry fields: `id`, `timestamp` (ISO 8601 UTC), `category`, `title`, `symptom`,
   `tried`, `rootCause`, `fix`, `lesson`. All required. `id` is a string (e.g. `"entry-001"`).
-- Categories enum: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`. Defined in
-  both `<select>`s in `index.html` and documented in `.doc/spec.md` — update all three.
-- `scripts.js:2` hardcodes `API_URL = "http://localhost:3000/entries"`; there is no env
+- Categories enum: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript`.
+  Single source is `CATEGORY_OPTIONS` in `data.js`; documented in `.doc/spec.md` — update both.
+- `data.js:2` hardcodes `API_URL = "http://localhost:3000/entries"`; there is no env
   loading. The README's `VITE_API_URL` advice is aspirational, not implemented.
 - JSON Server 0.17.x persists POST/PUT/PATCH/DELETE back into `data/entries.json`. Review
   or restore with `git diff -- data/entries.json` after mutation testing.
 
 ## Gotchas
 
-- The frontend script is `scripts.js` (plural). README and `.doc/spec.md` refer to
-  `script.js` / `data.js`, which do not exist.
+- The frontend entry script is `scripts.js` (plural) and the data layer is `data.js`.
+  Older notes referring to a singular `script.js` are stale.
 - The app is read-only despite the UI. `#openFormBtn`, `#editEntryBtn`, `#deleteEntryBtn`,
   and the `#entryModal` form exist in HTML but have no JS handlers; create/edit/delete are
   unimplemented.

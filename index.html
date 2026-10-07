@@ -30,8 +30,8 @@
         <i class="bi bi-journal-code me-2"></i>TRACE DIARY
       </a>
       <div class="d-flex align-items-center gap-3">
-        <i class="bi bi-search text-light role-button"></i>
-        <i class="bi bi-person-circle fs-5 text-light"></i>
+        <i class="bi bi-search text-light" aria-hidden="true"></i>
+        <i class="bi bi-person-circle fs-5 text-light" aria-hidden="true"></i>
       </div>
     </div>
   </nav>
@@ -42,7 +42,7 @@
     <div class="row g-4">
 
       <!-- LEFT / LIST VIEW PANEL -->
-      <div id="listView" class="col-12 col-md-5 d-block">
+      <div id="listView" class="col-12 col-md-5 d-block" tabindex="-1">
 
         <!-- Controls & Add Button -->
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -85,9 +85,9 @@
 
       <!-- RIGHT / DETAILED VIEW PANEL -->
       <div id="detailView" class="col-12 col-md-7 d-none d-md-block">
-        <div class="card shadow-sm border-0">
+        <div class="card shadow-sm border-0" id="detailCard" tabindex="-1">
           <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
-            <button class="btn btn-outline-secondary btn-sm d-md-none" id="backToListBtn" title="Back to list">
+            <button class="btn btn-outline-secondary btn-sm d-md-none" id="backToListBtn" title="Back to list" aria-label="Back to list">
               <i class="bi bi-arrow-left me-1"></i> Back
             </button>
             <span class="fw-semibold text-muted small" id="detailHeaderTitle">TraceDiary Entry</span>
@@ -108,7 +108,7 @@
     <section id="console-container" class="console-container" hidden>
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h2 class="h6 mb-0 fw-semibold text-muted">
-          <i class="bi bi-terminal me-1"></i>Console Output
+          <i class="bi bi-terminal me-1" aria-hidden="true"></i>Console Output
         </h2>
         <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" id="clearConsoleBtn" title="Clear console" aria-label="Clear console">
           <i class="bi bi-x-lg"></i>
@@ -189,6 +189,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.2/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="./data.js"></script>
   <script src="./scripts.js"></script>
 </body>
 </html>
