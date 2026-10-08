@@ -147,6 +147,15 @@
               >
               <div id="detailActionGroup" class="d-none">
                 <button
+                  type="button"
+                  class="btn btn-outline-info btn-sm me-1"
+                  id="aiReviewBtn"
+                  title="AI review"
+                  aria-label="Review this entry with AI"
+                >
+                  <i class="bi bi-robot" aria-hidden="true"></i>
+                </button>
+                <button
                   class="btn btn-outline-primary btn-sm me-1"
                   id="editEntryBtn"
                   title="Edit Entry"
@@ -353,7 +362,11 @@
         );
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Markdown rendering + sanitization for the AI review output -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.0/lib/marked.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js"></script>
     <script src="./data.js"></script>
+    <script src="./ai.js"></script>
     <script src="./scripts.js"></script>
   </body>
 </html>

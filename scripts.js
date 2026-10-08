@@ -138,6 +138,7 @@ const refreshBtn = document.getElementById("refreshBtn");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 
 const backToListBtn = document.getElementById("backToListBtn");
+const aiReviewBtn = document.getElementById("aiReviewBtn");
 const editEntryBtn = document.getElementById("editEntryBtn");
 const deleteEntryBtn = document.getElementById("deleteEntryBtn");
 const openFormBtn = document.getElementById("openFormBtn");
@@ -1170,6 +1171,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const entry = findEntryById(activeEntryId);
     if (entry) {
       openEditForm(entry);
+    }
+  });
+
+  aiReviewBtn.addEventListener("click", async () => {
+    const entry = findEntryById(activeEntryId);
+    if (!entry) {
+      return;
+    }
+    aiReviewBtn.disabled = true;
+    try {
+      await requestAiReview(entry);
+    } finally {
+      aiReviewBtn.disabled = false;
     }
   });
 

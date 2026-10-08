@@ -161,3 +161,66 @@
 .console-line--success { color: #6a9955; }
 .console-line--warn    { color: #dcdcaa; }
 .console-line--error   { color: #f48771; }
+
+/* ── AI review (rendered Markdown) ──────────────────── */
+.ai-review-markdown {
+  font-size: 0.9rem;
+}
+
+.ai-review-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.ai-review-markdown h1,
+.ai-review-markdown h2,
+.ai-review-markdown h3,
+.ai-review-markdown h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+}
+
+.ai-review-markdown table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ai-review-markdown th,
+.ai-review-markdown td {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  vertical-align: top;
+}
+
+.ai-review-markdown th {
+  background-color: var(--bs-tertiary-bg);
+  text-align: left;
+}
+
+.ai-review-markdown pre {
+  background-color: var(--bs-tertiary-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--bs-border-radius-sm);
+  overflow-x: auto;
+}
+
+.ai-review-markdown code {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.85em;
+  background-color: var(--bs-tertiary-bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--bs-border-radius-sm);
+}
+
+.ai-review-markdown pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
+.ai-review-markdown blockquote {
+  border-left: 3px solid var(--bs-border-color);
+  padding-left: 0.75rem;
+  color: var(--bs-secondary-color);
+}

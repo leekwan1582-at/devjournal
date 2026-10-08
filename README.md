@@ -86,10 +86,12 @@ Add the following script to the existing `scripts` object in `package.json`:
 ```json
 {
   "scripts": {
-    "mock-api": "json-server data/entries.json --host 0.0.0.0 --port 3000"
+    "mock-api": "json-server data/entries.json --host 0.0.0.0 --port 3000 --middlewares ./ai-proxy.js"
   }
 }
 ```
+
+The `--middlewares ./ai-proxy.js` flag also enables the AI entry review endpoint. If you only want the mock REST API, drop that flag.
 
 Do not create a second top-level JSON object. For example, this is invalid:
 
@@ -340,6 +342,146 @@ Then access it with:
 const API_URL = import.meta.env.VITE_API_URL;
 ```
 
+## AI Entry Review (DeepSeek)
+
+TraceDiary can send a single log entry to [DeepSeek](https://api.deepseek.com) for an automated rubric review (symptom clarity, environment context, `tried`, root cause, fix, lesson, technical accuracy). The result appears inline in the detail pane under **AI Review**.
+
+**The API key never reaches the browser.** The page calls a local endpoint, `POST /api/ai-review`, served by `ai-proxy.js` — a JSON Server middleware that holds the key and forwards the request to DeepSeek.
+
+### How it works
+
+```text
+Browser (ai.js)
+      │  POST /api/ai-review  { entry }
+      ▼
+JSON Server + ai-proxy.js middleware   ← reads .env, holds the API key
+      │  POST /chat/completions  (Authorization: Bearer …)
+      ▼
+DeepSeek API
+      │  { review }
+      ▼
+Browser renders the review inline
+```
+
+### Prerequisites
+
+- Node.js 18 or newer (uses the global `fetch`; this project targets Node 22)
+- A DeepSeek account and API key: <https://platform.deepseek.com/api_keys>
+
+### Step-by-step setup
+
+**1. Create the `.env` file** in the repository root (next to `package.json`):
+
+```env
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_API_KEY=your_api_key_here
+DEEPSEEK_MODEL=deepseek-flash
+```
+
+If a template is present, copy it instead:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and paste your real key. Put no spaces around `=` and no quotes around the value.
+
+The middleware loads `.env` with `override: true`, so these values take precedence over any `DEEPSEEK_*` variables already exported in your shell. Variables are read once at startup, so **restart `npm run mock-api` after any change to `.env`.**
+
+**2. Confirm `.env` is ignored by Git**
+
+`.env` is listed in `.gitignore`. Verify:
+
+```bash
+git check-ignore .env
+```
+
+If it prints nothing, the file is already tracked. Untrack it without deleting it:
+
+```bash
+git rm --cached .env
+```
+
+**3. Install dependencies**
+
+```bash
+npm install
+```
+
+**4. Start the mock API with the AI middleware**
+
+`npm run mock-api` already includes the middleware:
+
+```bash
+npm run mock-api
+```
+
+Equivalent direct command:
+
+```bash
+npx json-server data/entries.json --host 0.0.0.0 --port 3000 --middlewares ./ai-proxy.js
+```
+
+You should see `Loading ./ai-proxy.js` in the output. The server must stay running.
+
+**5. Use it in the app**
+
+Open `index.html` in a browser (or serve the folder statically). Select an entry in the list, then click the robot icon in the detail pane header. The review appears below the entry, rendered from Markdown (via `marked`, loaded from cdnjs) and sanitized with `DOMPurify` before insertion. If those CDN scripts are unavailable, the raw text is shown instead. The button is disabled while the request is in flight. Once a review is shown, **Copy** and **Download** buttons appear in the AI Review header — both use the raw Markdown, and Download saves a `.md` file.
+
+### Configuration reference
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DEEPSEEK_API_KEY` | Yes | — | Bearer token for the DeepSeek API. |
+| `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com` | API base URL; a `/v1` suffix also works. |
+| `DEEPSEEK_MODEL` | No | `deepseek-flash` | Model name passed to the API. |
+
+### Test the endpoint without the UI
+
+With the server running:
+
+```bash
+curl -X POST http://localhost:3000/api/ai-review \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entry": {
+      "id": "entry-001",
+      "timestamp": "2026-10-05T19:30:00Z",
+      "category": "MQL5",
+      "title": "Array out of range in OnTick",
+      "symptom": "EA halts with error 4002.",
+      "tried": "Printed the buffer size.",
+      "rootCause": "Indicator handle re-initialized inside the event loop.",
+      "fix": "Moved initialization to OnInit().",
+      "lesson": "Separate handle allocation from tick logic."
+    }
+  }'
+```
+
+A successful response looks like:
+
+```json
+{ "review": "- Scores table …\n- Top 3 gaps …\n- Rewritten section …\n- Overall verdict: Revise" }
+```
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `Could not reach the AI review service.` | The mock API is not running, or the page cannot reach `http://localhost:3000`. Run `npm run mock-api`. |
+| `Server is missing DEEPSEEK_API_KEY.` | `.env` is missing/empty or the key line is malformed. Use `DEEPSEEK_API_KEY=...` with no spaces around `=`. |
+| `DeepSeek API error (HTTP 401).` | The key is invalid or revoked. Generate a new one at <https://platform.deepseek.com/api_keys>. |
+| `DeepSeek API error (HTTP 402).` | The DeepSeek account has insufficient balance. Add credit or use another key. |
+| Edited `.env` but the error is unchanged | The server reads `.env` only at startup (and now overrides the shell). Restart `npm run mock-api`. |
+| `The AI review timed out.` | The request exceeded 60 seconds. Retry, or pick a faster model with `DEEPSEEK_MODEL`. |
+| `Loading ./ai-proxy.js` never appears | `npm run mock-api` is out of date. Run the direct `npx json-server … --middlewares ./ai-proxy.js` command above. |
+
+### Security notes
+
+- The API key is read only by `ai-proxy.js` on the server and is never sent to the browser.
+- Keep `.env` out of Git (`git check-ignore .env`). If a key was ever committed, rotate it.
+- The request includes the full entry text; only send entries you are comfortable sharing with the DeepSeek API.
+
 ## Useful API Requests
 
 Retrieve all entries:
@@ -411,15 +553,21 @@ Commit these files:
 package.json
 package-lock.json
 data/entries.json
+ai.js
+ai-proxy.js
+.env.example
 ```
 
-Do not commit `node_modules/`.
+Do not commit `node_modules/` or `.env`.
 
 Add this entry to `.gitignore`:
 
 ```gitignore
 node_modules/
+.env
 ```
+
+`.env` holds the DeepSeek API key used by the AI review middleware and must never be committed. A committed API key is compromised — rotate it.
 
 ## Quick Start
 
