@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/leekwan1582-at/devjournal#readme",
   "dependencies": {
+    "dotenv": "^18.0.6",
     "jason-server": "^3.0.0"
   },
   "devDependencies": {

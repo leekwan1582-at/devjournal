@@ -143,7 +143,7 @@ const deleteEntryBtn = document.getElementById("deleteEntryBtn");
 const openFormBtn = document.getElementById("openFormBtn");
 
 const entryModalElement = document.getElementById("entryModal");
-let entryModal = null;
+const entryModal = new bootstrap.Modal(entryModalElement);
 const formModalTitle = document.getElementById("formModalTitle");
 const logForm = document.getElementById("logForm");
 const entryIdInput = document.getElementById("entryId");
@@ -156,26 +156,6 @@ const clearConsoleBtn = document.getElementById("clearConsoleBtn");
 
 const MOBILE_QUERY = window.matchMedia("(max-width: 767.98px)");
 const THEME_MEDIA = window.matchMedia("(prefers-color-scheme: dark)");
-
-// ── Global Error Safety Net ──────────────────────────────────────────────
-// Surface otherwise-unhandled errors in the on-screen console (and a dialog)
-// instead of leaving them visible only in devtools.
-window.addEventListener("unhandledrejection", (event) => {
-  const reason = event.reason;
-  const message = reason && reason.message ? reason.message : String(reason);
-  console.error("Unhandled promise rejection:", reason);
-  logMessage("error", `Unhandled promise rejection: ${message}`);
-  showErrorDialog("Unexpected error", message);
-});
-
-window.addEventListener("error", (event) => {
-  if (!event.message) {
-    return; // ignore resource-load errors (images, stylesheets), which have no message
-  }
-  console.error("Unexpected error:", event.error || event.message);
-  logMessage("error", `Unexpected error: ${event.message}`);
-  showErrorDialog("Unexpected error", event.message);
-});
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -625,12 +605,10 @@ function renderEntriesList(entries) {
  * Re-render the entry list using current filter/sort state.
  *
  * Handles the two empty states (no entries at all, no matches) and
- * delegates to {@link renderEntriesList} otherwise. If the currently open
- * entry is filtered out of the visible list, the detail pane is reset.
+ * delegates to {@link renderEntriesList} otherwise.
  *
  * @returns {void}
  * @see filterAndSortEntries
- * @see resetDetailView
  */
 function applyFilters() {
   if (getEntries().length === 0) {
@@ -643,13 +621,6 @@ function applyFilters() {
     category: categoryFilterValue,
     sort: sortOption,
   });
-
-  if (
-    activeEntryId !== null &&
-    !visibleEntries.some((entry) => String(entry.id) === String(activeEntryId))
-  ) {
-    resetDetailView();
-  }
 
   if (visibleEntries.length === 0) {
     renderListMessage("No entries match your search or filter.");
@@ -815,8 +786,7 @@ async function refreshEntries() {
 function collectEntryFormPayload() {
   const payload = {};
   FORM_FIELDS.forEach((name) => {
-    const field = document.getElementById(name);
-    payload[name] = field ? field.value.trim() : "";
+    payload[name] = document.getElementById(name).value.trim();
   });
   return payload;
 }
@@ -835,15 +805,9 @@ function getMissingFields(payload) {
  * @returns {void}
  */
 function populateEntryForm(entry) {
-  if (!entry) {
-    throw new Error("populateEntryForm requires an entry");
-  }
   entryIdInput.value = entry.id;
   FORM_FIELDS.forEach((name) => {
-    const field = document.getElementById(name);
-    if (field) {
-      field.value = entry[name] ?? "";
-    }
+    document.getElementById(name).value = entry[name] ?? "";
   });
 }
 
@@ -857,34 +821,13 @@ function resetEntryForm() {
 }
 
 /**
- * Get the Bootstrap modal instance, creating it on first use.
- * @returns {Object|null} The modal instance, or null if Bootstrap is unavailable.
- */
-function getEntryModal() {
-  if (
-    entryModal === null &&
-    typeof bootstrap !== "undefined" &&
-    typeof bootstrap.Modal !== "undefined"
-  ) {
-    entryModal = bootstrap.Modal.getOrCreateInstance(entryModalElement);
-  }
-  return entryModal;
-}
-
-/**
  * Open the modal in create mode.
  * @returns {void}
  */
 function openCreateForm() {
-  const modal = getEntryModal();
-  if (modal === null) {
-    logMessage("error", "Cannot open form: modal library unavailable");
-    showErrorDialog("Form unavailable", "The entry form could not be opened.");
-    return;
-  }
   resetEntryForm();
   formModalTitle.textContent = "Create New Entry";
-  modal.show();
+  entryModal.show();
 }
 
 /**
@@ -893,22 +836,9 @@ function openCreateForm() {
  * @returns {void}
  */
 function openEditForm(entry) {
-  if (!entry) {
-    logMessage("warn", "Edit requested but no entry is selected");
-    showErrorDialog("Edit unavailable", "That entry could not be found.");
-    return;
-  }
-
-  const modal = getEntryModal();
-  if (modal === null) {
-    logMessage("error", "Cannot open form: modal library unavailable");
-    showErrorDialog("Form unavailable", "The entry form could not be opened.");
-    return;
-  }
-
   populateEntryForm(entry);
   formModalTitle.textContent = "Edit Entry";
-  modal.show();
+  entryModal.show();
 }
 
 /**
@@ -959,10 +889,7 @@ async function handleEntryFormSubmit(event) {
       ? await createEntry(payload)
       : await updateEntry(editId, payload);
 
-    const modal = getEntryModal();
-    if (modal) {
-      modal.hide();
-    }
+    entryModal.hide();
     if (isCreate) {
       clearFilters(); // make sure the new entry is visible in the list
     }
@@ -1157,26 +1084,9 @@ document.addEventListener("DOMContentLoaded", () => {
   themeToggleBtn.addEventListener("click", cycleTheme);
   clearConsoleBtn.addEventListener("click", clearConsole);
 
-  // Create entry (floating action button)
-  openFormBtn.addEventListener("click", openCreateForm);
-
   // Detail pane
   backToListBtn.addEventListener("click", () => {
     showListViewMobile();
     listView.focus();
-  });
-
-  editEntryBtn.addEventListener("click", () => {
-    const entry = findEntryById(activeEntryId);
-    if (entry) {
-      openEditForm(entry);
-    }
-  });
-
-  deleteEntryBtn.addEventListener("click", () => {
-    const entry = findEntryById(activeEntryId);
-    if (entry) {
-      handleDeleteEntry(entry);
-    }
   });
 });

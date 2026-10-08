@@ -34,21 +34,21 @@ Bootstrap 5 provides the layout and styling and satisfies the requirement that t
 
 ### 3.1 Mobile Wireframe
 
-![Mobile wireframe](Gemini_Generated_wireframe.jpeg)
+![Wireframe](images/Gemini_Generated_wireframe.jpeg)
 
 ### 3.2 Form
 
 Use Bootstrap form controls (`form-control`, `mb-3`) for the entry fields:
 
-| Field | Control |
-|---|---|
-| Category | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure, Javascript) |
-| Title | text input |
-| Symptom | textarea |
-| Tried | textarea |
-| Root Cause | textarea |
-| Fix | textarea |
-| Lesson | text input |
+| Field      | Control                                                                   |
+| ---------- | ------------------------------------------------------------------------- |
+| Category   | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure, Javascript) |
+| Title      | text input                                                                |
+| Symptom    | textarea                                                                  |
+| Tried      | textarea                                                                  |
+| Root Cause | textarea                                                                  |
+| Fix        | textarea                                                                  |
+| Lesson     | text input                                                                |
 
 The six core fields are Title, Symptom, Tried, Root Cause, Fix, and Lesson. Category is a seventh field that acts as the tag.
 
@@ -61,7 +61,10 @@ Render saved logs as Bootstrap Cards. Each card must include an **Edit** button 
 Load Bootstrap Icons:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+/>
 ```
 
 **Logo** (`bi-journal-code` is the primary choice)
@@ -82,59 +85,63 @@ Alternatives: `bi-person-badge`, `bi-person-gear`.
 
 **CRUD operations**
 
-| Operation | Icon | Use |
-|---|---|---|
-| Create | `bi-plus-lg` | Floating Action Button (FAB) for a new entry |
-| Read | `bi-search` | Search and filter log history in the header |
-| Update | `bi-pencil` | Edit an entry |
-| Delete | `bi-trash3` | Remove an entry |
+| Operation | Icon         | Use                                          |
+| --------- | ------------ | -------------------------------------------- |
+| Create    | `bi-plus-lg` | Floating Action Button (FAB) for a new entry |
+| Read      | `bi-search`  | Search and filter log history in the header  |
+| Update    | `bi-pencil`  | Edit an entry                                |
+| Delete    | `bi-trash3`  | Remove an entry                              |
 
 ```html
-<i class="bi bi-plus-lg"></i>   <!-- Create -->
-<i class="bi bi-search"></i>    <!-- Read / Search -->
-<i class="bi bi-pencil"></i>    <!-- Update -->
-<i class="bi bi-trash3"></i>    <!-- Delete -->
+<i class="bi bi-plus-lg"></i>
+<!-- Create -->
+<i class="bi bi-search"></i>
+<!-- Read / Search -->
+<i class="bi bi-pencil"></i>
+<!-- Update -->
+<i class="bi bi-trash3"></i>
+<!-- Delete -->
 ```
 
 **Categories**
 
-| Category | Icon |
-|---|---|
-| MQL5 / Expert Advisors | `bi-cpu` |
-| Data Pipeline | `bi-diagram-3` or `bi-database` |
+| Category               | Icon                            |
+| ---------------------- | ------------------------------- |
+| MQL5 / Expert Advisors | `bi-cpu`                        |
+| Data Pipeline          | `bi-diagram-3` or `bi-database` |
 
 **Structured fields**
 
-| Field | Icon |
-|---|---|
-| Symptom | `bi-exclamation-triangle` |
-| Tried | `bi-tools` or `bi-lightbulb` |
-| Root Cause | `bi-diagram-2` or `bi-tree` |
-| Fix | `bi-check2-circle` or `bi-wrench-adjustable` |
-| Lesson | `bi-bookmark-star` |
+| Field      | Icon                                         |
+| ---------- | -------------------------------------------- |
+| Symptom    | `bi-exclamation-triangle`                    |
+| Tried      | `bi-tools` or `bi-lightbulb`                 |
+| Root Cause | `bi-diagram-2` or `bi-tree`                  |
+| Fix        | `bi-check2-circle` or `bi-wrench-adjustable` |
+| Lesson     | `bi-bookmark-star`                           |
 
 **Navigation and layout**
 
-| Purpose | Icon |
-|---|---|
-| Filter by category | `bi-funnel` |
-| Sort chronologically | `bi-sort-down` |
+| Purpose                           | Icon               |
+| --------------------------------- | ------------------ |
+| Filter by category                | `bi-funnel`        |
+| Sort chronologically              | `bi-sort-down`     |
 | Entry tap indicator (mobile list) | `bi-chevron-right` |
-| Back to list (mobile detail) | `bi-arrow-left` |
+| Back to list (mobile detail)      | `bi-arrow-left`    |
 
 ### 3.5 Accessibility
 
 The interface is keyboard-operable and exposes its state to assistive technology:
 
-| Area | Behavior |
-|---|---|
-| Entry cards | Rendered with `role="button"` and `tabindex="0"`, plus an `aria-label` that names the entry. |
-| Card activation | `Enter` and `Space` open the detail view; the default `Space` scroll is suppressed. |
-| Icon controls | Every icon-only button carries an `aria-label` (Create, Search, Edit, Delete, Back, Refresh, Clear console). Purely decorative icons use `aria-hidden="true"`. |
-| Focus management | Selecting an entry in the mobile layout moves focus to the detail pane; the Back button returns focus to the list pane. |
-| Visible focus | Cards and the detail pane show a `:focus-visible` / `:focus` outline. |
-| Form controls | Search, category, and sort use native controls with associated labels. |
-| Status messages | The console log uses `role="status"` and `aria-live="polite"`. |
+| Area             | Behavior                                                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry cards      | Rendered with `role="button"` and `tabindex="0"`, plus an `aria-label` that names the entry.                                                                   |
+| Card activation  | `Enter` and `Space` open the detail view; the default `Space` scroll is suppressed.                                                                            |
+| Icon controls    | Every icon-only button carries an `aria-label` (Create, Search, Edit, Delete, Back, Refresh, Clear console). Purely decorative icons use `aria-hidden="true"`. |
+| Focus management | Selecting an entry in the mobile layout moves focus to the detail pane; the Back button returns focus to the list pane.                                        |
+| Visible focus    | Cards and the detail pane show a `:focus-visible` / `:focus` outline.                                                                                          |
+| Form controls    | Search, category, and sort use native controls with associated labels.                                                                                         |
+| Status messages  | The console log uses `role="status"` and `aria-live="polite"`.                                                                                                 |
 
 ---
 
@@ -187,7 +194,13 @@ Design-time blueprint of the dataset. It documents the structure without relying
           "category": {
             "type": "string",
             "description": "The technology stack, domain, or environment related to the issue.",
-            "enum": ["MQL5", "Data Pipeline", "Backtesting", "Infrastructure", "Javascript"]
+            "enum": [
+              "MQL5",
+              "Data Pipeline",
+              "Backtesting",
+              "Infrastructure",
+              "Javascript"
+            ]
           },
           "title": {
             "type": "string",
@@ -214,7 +227,17 @@ Design-time blueprint of the dataset. It documents the structure without relying
             "description": "Key takeaway or architectural note to avoid recurrence."
           }
         },
-        "required": ["id", "timestamp", "category", "title", "symptom", "tried", "rootCause", "fix", "lesson"],
+        "required": [
+          "id",
+          "timestamp",
+          "category",
+          "title",
+          "symptom",
+          "tried",
+          "rootCause",
+          "fix",
+          "lesson"
+        ],
         "additionalProperties": false
       }
     }
@@ -232,14 +255,18 @@ Design-time blueprint of the dataset. It documents the structure without relying
 
 **Entry item properties**
 
-| Field | Type | Format / Constraints | Required | Description |
-|---|---|---|---|---|
-| `id` | String | Unique alphanumeric string | Yes | Unique identifier for the entry. |
-| `timestamp` | String | ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`) | Yes | When the record was created. |
-| `category` | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript` | Yes | Technical domain of the log. |
-| `title` | String | Plain text | Yes | Short title describing the scope of the log. |
-| `symptom` | String | Plain text | Yes | Observable errors, console output, or crashes. |
-| `tried` | String | Plain text | Yes | Actions taken before the cause was found. |
-| `rootCause` | String | Plain text | Yes | Core reason behind the failure. |
-| `fix` | String | Plain text | Yes | Steps taken to resolve the issue. |
-| `lesson` | String | Plain text | Yes | Best-practice takeaway from the event. |
+| Field       | Type   | Format / Constraints                                                           | Required | Description                                    |
+| ----------- | ------ | ------------------------------------------------------------------------------ | -------- | ---------------------------------------------- |
+| `id`        | String | Unique alphanumeric string                                                     | Yes      | Unique identifier for the entry.               |
+| `timestamp` | String | ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`)                                          | Yes      | When the record was created.                   |
+| `category`  | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript` | Yes      | Technical domain of the log.                   |
+| `title`     | String | Plain text                                                                     | Yes      | Short title describing the scope of the log.   |
+| `symptom`   | String | Plain text                                                                     | Yes      | Observable errors, console output, or crashes. |
+| `tried`     | String | Plain text                                                                     | Yes      | Actions taken before the cause was found.      |
+| `rootCause` | String | Plain text                                                                     | Yes      | Core reason behind the failure.                |
+| `fix`       | String | Plain text                                                                     | Yes      | Steps taken to resolve the issue.              |
+| `lesson`    | String | Plain text                                                                     | Yes      | Best-practice takeaway from the event.         |
+
+### 5.3 State diagram
+
+![State Diagram](images/State-diagram.png)

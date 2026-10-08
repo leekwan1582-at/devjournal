@@ -1,4 +1,32 @@
-/**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: scripts.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: scripts.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
  * @file TraceDiary application logic: DOM, events, rendering, filters.
  *       State and API calls live in data.js
  *       (getEntries, findEntryById, fetchEntries, createEntry, updateEntry, deleteEntry).
@@ -143,7 +171,7 @@ const deleteEntryBtn = document.getElementById("deleteEntryBtn");
 const openFormBtn = document.getElementById("openFormBtn");
 
 const entryModalElement = document.getElementById("entryModal");
-let entryModal = null;
+const entryModal = new bootstrap.Modal(entryModalElement);
 const formModalTitle = document.getElementById("formModalTitle");
 const logForm = document.getElementById("logForm");
 const entryIdInput = document.getElementById("entryId");
@@ -157,26 +185,6 @@ const clearConsoleBtn = document.getElementById("clearConsoleBtn");
 const MOBILE_QUERY = window.matchMedia("(max-width: 767.98px)");
 const THEME_MEDIA = window.matchMedia("(prefers-color-scheme: dark)");
 
-// ── Global Error Safety Net ──────────────────────────────────────────────
-// Surface otherwise-unhandled errors in the on-screen console (and a dialog)
-// instead of leaving them visible only in devtools.
-window.addEventListener("unhandledrejection", (event) => {
-  const reason = event.reason;
-  const message = reason && reason.message ? reason.message : String(reason);
-  console.error("Unhandled promise rejection:", reason);
-  logMessage("error", `Unhandled promise rejection: ${message}`);
-  showErrorDialog("Unexpected error", message);
-});
-
-window.addEventListener("error", (event) => {
-  if (!event.message) {
-    return; // ignore resource-load errors (images, stylesheets), which have no message
-  }
-  console.error("Unexpected error:", event.error || event.message);
-  logMessage("error", `Unexpected error: ${event.message}`);
-  showErrorDialog("Unexpected error", event.message);
-});
-
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -186,13 +194,13 @@ window.addEventListener("error", (event) => {
  */
 function escapeHtml(value) {
   const entities = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+    "&amp;": "&amp;amp;",
+    "&lt;": "&amp;lt;",
+    ">": "&amp;gt;",
+    '"': "&amp;quot;",
+    "'": "&amp;#39;",
   };
-  return String(value ?? "").replace(/[&<>"']/g, (char) => entities[char]);
+  return String(value ?? "").replace(/[&amp;&lt;>"']/g, (char) => entities[char]);
 }
 
 /**
@@ -230,8 +238,8 @@ function isTypingTarget(element) {
 function categoryBadgeHtml(category, extraClasses = "") {
   const icon = CATEGORY_ICONS[category] ?? DEFAULT_CATEGORY_ICON;
   return (
-    `<span class="badge badge-category ${extraClasses}">` +
-    `<i class="bi ${icon} me-1" aria-hidden="true"></i>${escapeHtml(category)}</span>`
+    `&lt;span class="badge badge-category ${extraClasses}">` +
+    `&lt;i class="bi ${icon} me-1" aria-hidden="true">&lt;/i>${escapeHtml(category)}&lt;/span>`
   );
 }
 
@@ -340,7 +348,7 @@ function showErrorDialog(title, text) {
  * Uses SweetAlert2 if available, otherwise `window.confirm`.
  *
  * @param {string} entryTitle  Shown in the confirmation text.
- * @returns {Promise<boolean>} True if the user confirmed.
+ * @returns {Promise&lt;boolean>} True if the user confirmed.
  */
 async function confirmDelete(entryTitle) {
   if (typeof Swal === "undefined") {
@@ -541,7 +549,7 @@ function filterAndSortEntries(entries, options) {
   const query = options.searchTerm.trim().toLowerCase();
 
   const filtered = entries.filter((entry) => {
-    if (options.category !== "ALL" && entry.category !== options.category) {
+    if (options.category !== "ALL" &amp;&amp; entry.category !== options.category) {
       return false;
     }
     return (
@@ -583,20 +591,20 @@ function createEntryCard(item, position, total) {
   }
 
   card.innerHTML = `
-    <div class="card-body py-2">
-      <div class="d-flex justify-content-between align-items-start gap-2">
-        <div class="min-w-0">
-          <div class="mb-1">${categoryBadgeHtml(item.category)}</div>
-          <h3 class="h6 fw-bold mb-1 card-title-text">${escapeHtml(item.title)}</h3>
-          <div class="small text-body-secondary">Record ${position}/${total} · ${escapeHtml(formatDate(item.timestamp))}</div>
-        </div>
-        <div class="card-actions d-flex align-items-center gap-2">
-          <button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" aria-label="Edit entry: ${escapeHtml(item.title)}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
-          <button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" aria-label="Delete entry: ${escapeHtml(item.title)}"><i class="bi bi-trash3" aria-hidden="true"></i></button>
-          <i class="bi bi-chevron-right text-body-secondary d-md-none" aria-hidden="true"></i>
-        </div>
-      </div>
-    </div>`;
+    &lt;div class="card-body py-2">
+      &lt;div class="d-flex justify-content-between align-items-start gap-2">
+        &lt;div class="min-w-0">
+          &lt;div class="mb-1">${categoryBadgeHtml(item.category)}&lt;/div>
+          &lt;h3 class="h6 fw-bold mb-1 card-title-text">${escapeHtml(item.title)}&lt;/h3>
+          &lt;div class="small text-body-secondary">Record ${position}/${total} · ${escapeHtml(formatDate(item.timestamp))}&lt;/div>
+        &lt;/div>
+        &lt;div class="card-actions d-flex align-items-center gap-2">
+          &lt;button type="button" class="btn btn-outline-primary btn-sm card-edit-btn" title="Edit Entry" aria-label="Edit entry: ${escapeHtml(item.title)}">&lt;i class="bi bi-pencil" aria-hidden="true">&lt;/i>&lt;/button>
+          &lt;button type="button" class="btn btn-outline-danger btn-sm card-delete-btn" title="Delete Entry" aria-label="Delete entry: ${escapeHtml(item.title)}">&lt;i class="bi bi-trash3" aria-hidden="true">&lt;/i>&lt;/button>
+          &lt;i class="bi bi-chevron-right text-body-secondary d-md-none" aria-hidden="true">&lt;/i>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>`;
 
   return card;
 }
@@ -625,12 +633,10 @@ function renderEntriesList(entries) {
  * Re-render the entry list using current filter/sort state.
  *
  * Handles the two empty states (no entries at all, no matches) and
- * delegates to {@link renderEntriesList} otherwise. If the currently open
- * entry is filtered out of the visible list, the detail pane is reset.
+ * delegates to {@link renderEntriesList} otherwise.
  *
  * @returns {void}
  * @see filterAndSortEntries
- * @see resetDetailView
  */
 function applyFilters() {
   if (getEntries().length === 0) {
@@ -643,13 +649,6 @@ function applyFilters() {
     category: categoryFilterValue,
     sort: sortOption,
   });
-
-  if (
-    activeEntryId !== null &&
-    !visibleEntries.some((entry) => String(entry.id) === String(activeEntryId))
-  ) {
-    resetDetailView();
-  }
 
   if (visibleEntries.length === 0) {
     renderListMessage("No entries match your search or filter.");
@@ -705,19 +704,19 @@ function renderDetailContent(entry) {
 
   const fieldsHtml = DETAIL_FIELDS.map(
     ({ key, icon, mono }) => `
-    <section class="mb-3">
-      <h3 class="h6 fw-bold mb-1"><i class="bi ${icon} me-2" aria-hidden="true"></i>${FIELD_LABELS[key]}</h3>
-      <p class="detail-text mb-0 ${mono ? "log-text-block" : "text-body-secondary"}">${escapeHtml(entry[key])}</p>
-    </section>`,
+    &lt;section class="mb-3">
+      &lt;h3 class="h6 fw-bold mb-1">&lt;i class="bi ${icon} me-2" aria-hidden="true">&lt;/i>${FIELD_LABELS[key]}&lt;/h3>
+      &lt;p class="detail-text mb-0 ${mono ? "log-text-block" : "text-body-secondary"}">${escapeHtml(entry[key])}&lt;/p>
+    &lt;/section>`,
   ).join("");
 
   detailContent.dataset.category = entry.category;
   detailContent.innerHTML = `
-    <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+    &lt;div class="mb-3 d-flex flex-wrap align-items-center gap-2">
       ${categoryBadgeHtml(entry.category)}
-      <span class="small text-body-secondary">Record ${position}/${getEntries().length} · ${escapeHtml(formatDate(entry.timestamp))}</span>
-    </div>
-    <h2 class="h4 fw-bold mb-3">${escapeHtml(entry.title)}</h2>
+      &lt;span class="small text-body-secondary">Record ${position}/${getEntries().length} · ${escapeHtml(formatDate(entry.timestamp))}&lt;/span>
+    &lt;/div>
+    &lt;h2 class="h4 fw-bold mb-3">${escapeHtml(entry.title)}&lt;/h2>
     ${fieldsHtml}`;
 
   detailHeaderTitle.textContent = `Entry ${entry.id}`;
@@ -751,7 +750,7 @@ function resetDetailView() {
   detailHeaderTitle.textContent = "TraceDiary Entry";
   detailActionGroup.classList.add("d-none");
   detailContent.innerHTML =
-    '<p class="text-body-secondary text-center my-5">Select an entry from the list to view full details.</p>';
+    '&lt;p class="text-body-secondary text-center my-5">Select an entry from the list to view full details.&lt;/p>';
 }
 
 /**
@@ -784,7 +783,7 @@ function syncActiveEntry() {
  * syncs any open detail pane, and re-applies filters. On error, logs
  * and renders the failure message in the list.
  *
- * @returns {Promise<void>} Resolves when the request settles (never rejects).
+ * @returns {Promise&lt;void>} Resolves when the request settles (never rejects).
  */
 async function refreshEntries() {
   renderListMessage("Loading entries…");
@@ -815,8 +814,7 @@ async function refreshEntries() {
 function collectEntryFormPayload() {
   const payload = {};
   FORM_FIELDS.forEach((name) => {
-    const field = document.getElementById(name);
-    payload[name] = field ? field.value.trim() : "";
+    payload[name] = document.getElementById(name).value.trim();
   });
   return payload;
 }
@@ -835,15 +833,9 @@ function getMissingFields(payload) {
  * @returns {void}
  */
 function populateEntryForm(entry) {
-  if (!entry) {
-    throw new Error("populateEntryForm requires an entry");
-  }
   entryIdInput.value = entry.id;
   FORM_FIELDS.forEach((name) => {
-    const field = document.getElementById(name);
-    if (field) {
-      field.value = entry[name] ?? "";
-    }
+    document.getElementById(name).value = entry[name] ?? "";
   });
 }
 
@@ -857,34 +849,13 @@ function resetEntryForm() {
 }
 
 /**
- * Get the Bootstrap modal instance, creating it on first use.
- * @returns {Object|null} The modal instance, or null if Bootstrap is unavailable.
- */
-function getEntryModal() {
-  if (
-    entryModal === null &&
-    typeof bootstrap !== "undefined" &&
-    typeof bootstrap.Modal !== "undefined"
-  ) {
-    entryModal = bootstrap.Modal.getOrCreateInstance(entryModalElement);
-  }
-  return entryModal;
-}
-
-/**
  * Open the modal in create mode.
  * @returns {void}
  */
 function openCreateForm() {
-  const modal = getEntryModal();
-  if (modal === null) {
-    logMessage("error", "Cannot open form: modal library unavailable");
-    showErrorDialog("Form unavailable", "The entry form could not be opened.");
-    return;
-  }
   resetEntryForm();
   formModalTitle.textContent = "Create New Entry";
-  modal.show();
+  entryModal.show();
 }
 
 /**
@@ -893,22 +864,9 @@ function openCreateForm() {
  * @returns {void}
  */
 function openEditForm(entry) {
-  if (!entry) {
-    logMessage("warn", "Edit requested but no entry is selected");
-    showErrorDialog("Edit unavailable", "That entry could not be found.");
-    return;
-  }
-
-  const modal = getEntryModal();
-  if (modal === null) {
-    logMessage("error", "Cannot open form: modal library unavailable");
-    showErrorDialog("Form unavailable", "The entry form could not be opened.");
-    return;
-  }
-
   populateEntryForm(entry);
   formModalTitle.textContent = "Edit Entry";
-  modal.show();
+  entryModal.show();
 }
 
 /**
@@ -922,7 +880,7 @@ function openEditForm(entry) {
  * submit button is disabled for the duration to prevent double submits.
  *
  * @param {SubmitEvent} event
- * @returns {Promise<void>} Never rejects; API errors are caught internally.
+ * @returns {Promise&lt;void>} Never rejects; API errors are caught internally.
  * @see createEntry
  * @see updateEntry
  * @see collectEntryFormPayload
@@ -959,10 +917,7 @@ async function handleEntryFormSubmit(event) {
       ? await createEntry(payload)
       : await updateEntry(editId, payload);
 
-    const modal = getEntryModal();
-    if (modal) {
-      modal.hide();
-    }
+    entryModal.hide();
     if (isCreate) {
       clearFilters(); // make sure the new entry is visible in the list
     }
@@ -996,7 +951,7 @@ async function handleEntryFormSubmit(event) {
  * {@link showErrorDialog}.
  *
  * @param {Entry} entry
- * @returns {Promise<void>} Never rejects; API errors are caught internally.
+ * @returns {Promise&lt;void>} Never rejects; API errors are caught internally.
  * @see confirmDelete
  * @see deleteEntry
  */
@@ -1071,7 +1026,7 @@ function handleListClick(event) {
  * @returns {void}
  */
 function handleListKeydown(event) {
-  if (event.key !== "Enter" && event.key !== " ") {
+  if (event.key !== "Enter" &amp;&amp; event.key !== " ") {
     return;
   }
   // Let the Edit and Delete buttons handle their own keys
@@ -1101,7 +1056,7 @@ function handleListKeydown(event) {
  */
 function handleGlobalKeydown(event) {
   // Escape inside dialogs belongs to the dialog, not the page
-  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+  if (typeof Swal !== "undefined" &amp;&amp; Swal.isVisible()) {
     return;
   }
   if (entryModalElement.classList.contains("show")) {
@@ -1112,10 +1067,10 @@ function handleGlobalKeydown(event) {
     resetDetailView();
     showListViewMobile();
   } else if (
-    event.key === "n" &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    !event.altKey &&
+    event.key === "n" &amp;&amp;
+    !event.ctrlKey &amp;&amp;
+    !event.metaKey &amp;&amp;
+    !event.altKey &amp;&amp;
     !isTypingTarget(event.target)
   ) {
     openCreateForm();
@@ -1157,26 +1112,32 @@ document.addEventListener("DOMContentLoaded", () => {
   themeToggleBtn.addEventListener("click", cycleTheme);
   clearConsoleBtn.addEventListener("click", clearConsole);
 
-  // Create entry (floating action button)
-  openFormBtn.addEventListener("click", openCreateForm);
-
   // Detail pane
   backToListBtn.addEventListener("click", () => {
     showListViewMobile();
     listView.focus();
   });
-
-  editEntryBtn.addEventListener("click", () => {
-    const entry = findEntryById(activeEntryId);
-    if (entry) {
-      openEditForm(entry);
-    }
-  });
-
-  deleteEntryBtn.addEventListener("click", () => {
-    const entry = findEntryById(activeEntryId);
-    if (entry) {
-      handleDeleteEntry(entry);
-    }
-  });
 });
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts.html">scripts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Oct 08 2026 12:49:57 GMT+0800 (Singapore Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
