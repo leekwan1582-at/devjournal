@@ -29,7 +29,7 @@ files directly and opening `index.html`.
 
 - Entry fields: `id`, `timestamp` (ISO 8601 UTC), `category`, `title`, `symptom`,
   `tried`, `rootCause`, `fix`, `lesson`. All required. `id` is a string (e.g. `"entry-001"`).
-- Categories enum: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript`.
+- Categories enum: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `JavaScript`.
   Single source is `CATEGORY_OPTIONS` in `data.js`; documented in `.doc/spec.md` — update both.
 - `data.js:2` hardcodes `API_URL = "http://localhost:3000/entries"`; there is no env
   loading. The README's `VITE_API_URL` advice is aspirational, not implemented.

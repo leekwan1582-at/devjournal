@@ -42,7 +42,7 @@ Use Bootstrap form controls (`form-control`, `mb-3`) for the entry fields:
 
 | Field      | Control                                                                   |
 | ---------- | ------------------------------------------------------------------------- |
-| Category   | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure, Javascript) |
+| Category   | `<select>` (MQL5, Data Pipeline, Backtesting, Infrastructure, JavaScript) |
 | Title      | text input                                                                |
 | Symptom    | textarea                                                                  |
 | Tried      | textarea                                                                  |
@@ -199,7 +199,7 @@ Design-time blueprint of the dataset. It documents the structure without relying
               "Data Pipeline",
               "Backtesting",
               "Infrastructure",
-              "Javascript"
+              "JavaScript"
             ]
           },
           "title": {
@@ -259,7 +259,7 @@ Design-time blueprint of the dataset. It documents the structure without relying
 | ----------- | ------ | ------------------------------------------------------------------------------ | -------- | ---------------------------------------------- |
 | `id`        | String | Unique alphanumeric string                                                     | Yes      | Unique identifier for the entry.               |
 | `timestamp` | String | ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`)                                          | Yes      | When the record was created.                   |
-| `category`  | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `Javascript` | Yes      | Technical domain of the log.                   |
+| `category`  | String | One of: `MQL5`, `Data Pipeline`, `Backtesting`, `Infrastructure`, `JavaScript` | Yes      | Technical domain of the log.                   |
 | `title`     | String | Plain text                                                                     | Yes      | Short title describing the scope of the log.   |
 | `symptom`   | String | Plain text                                                                     | Yes      | Observable errors, console output, or crashes. |
 | `tried`     | String | Plain text                                                                     | Yes      | Actions taken before the cause was found.      |

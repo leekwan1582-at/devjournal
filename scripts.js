@@ -18,7 +18,7 @@
  * @property {string}        rootCause
  * @property {string}        fix
  * @property {string}        lesson
- * @property {string}        timestamp ISO 8601 date string.
+ * @property {string}        timestamp ISO 8601 date-time string.
  */
 
 /**
@@ -87,7 +87,7 @@ const CATEGORY_ICONS = {
   "Data Pipeline": "bi-diagram-3",
   Backtesting: "bi-graph-up-arrow",
   Infrastructure: "bi-hdd-network",
-  Javascript: "bi-filetype-js",
+  JavaScript: "bi-filetype-js",
 };
 const DEFAULT_CATEGORY_ICON = "bi-journal-text";
 
@@ -858,6 +858,22 @@ function resetEntryForm() {
 }
 
 /**
+ * Move focus out of the modal before Bootstrap sets `aria-hidden="true"`.
+ *
+ * Without this, Chrome logs "Blocked aria-hidden on an element because its
+ * descendant retained focus" when the modal is dismissed while a control
+ * inside it (e.g. the Cancel button) is focused.
+ *
+ * @returns {void}
+ */
+function blurEntryModalFocus() {
+  const active = document.activeElement;
+  if (active && entryModalElement.contains(active)) {
+    active.blur();
+  }
+}
+
+/**
  * Get the Bootstrap modal instance, creating it on first use.
  * @returns {Object|null} The modal instance, or null if Bootstrap is unavailable.
  */
@@ -1161,10 +1177,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // Create entry (floating action button)
   openFormBtn.addEventListener("click", openCreateForm);
 
+  // Form submit (create / update)
+  logForm.addEventListener("submit", handleEntryFormSubmit);
+
+  // Move focus out before Bootstrap applies aria-hidden (a11y warning).
+  entryModalElement.addEventListener("hide.bs.modal", blurEntryModalFocus);
+
   // Detail pane
   backToListBtn.addEventListener("click", () => {
     showListViewMobile();
     listView.focus();
+  });
+
+  deleteEntryBtn.addEventListener("click", () => {
+    const entry = findEntryById(activeEntryId);
+    if (entry) {
+      handleDeleteEntry(entry);
+    }
   });
 
   editEntryBtn.addEventListener("click", () => {
@@ -1184,13 +1213,6 @@ document.addEventListener("DOMContentLoaded", () => {
       await requestAiReview(entry);
     } finally {
       aiReviewBtn.disabled = false;
-    }
-  });
-
-  deleteEntryBtn.addEventListener("click", () => {
-    const entry = findEntryById(activeEntryId);
-    if (entry) {
-      handleDeleteEntry(entry);
     }
   });
 });

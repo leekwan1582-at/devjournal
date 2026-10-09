@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/**/*.test.js\"",
     "mock-api": "json-server data/entries.json --host 0.0.0.0 --port 3000 --middlewares ./ai-proxy.js"
   },
   "repository": {

@@ -482,6 +482,70 @@ A successful response looks like:
 - Keep `.env` out of Git (`git check-ignore .env`). If a key was ever committed, rotate it.
 - The request includes the full entry text; only send entries you are comfortable sharing with the DeepSeek API.
 
+## Testing
+
+TraceDiary uses Node's built-in test runner (`node:test`). The suite is **fully offline and mocked** — it does not call the real DeepSeek API and does **not** need JSON Server or `npm run mock-api` running.
+
+### Prerequisites
+
+- Node.js 22 or newer (the test runner and `--experimental-test-coverage` ship with Node).
+- Dependencies installed once from the repository root:
+
+```bash
+npm install
+```
+
+Running `npm run mock-api` is **not** required for the tests. Start it only when you want to use the app itself or exercise the API manually.
+
+### Run the tests
+
+```bash
+npm test
+```
+
+The current suite (P0–P5) reports:
+
+```text
+# tests 152
+# pass 152
+# fail 0
+```
+
+Run a single file (or a directory) directly:
+
+```bash
+node --test "test/unit/filters.test.js"
+```
+
+(Use the quoted glob `"test/**/*.test.js"` to run everything, or `node --test --watch "test/**/*.test.js"` while developing.)
+
+### Coverage
+
+```bash
+npm run test:coverage
+```
+
+> Node's `--experimental-test-coverage` only instruments modules loaded with `require`. The app scripts are executed inside `node:vm` by the test harness, so their lines are not in the Node coverage report — it currently reports the test helpers/fixtures. Full app coverage would need `c8`/`nyc` or extracting the logic into modules.
+
+### What is covered
+
+- **Unit (`test/unit/`)** — pure/logic helpers: `escapeHtml`, `formatDate`, `isTypingTarget`, `categoryBadgeHtml`, `sortEntries`, `filterAndSortEntries`, `describeRequestError`, and the theme functions (`getStoredTheme`, `applyTheme`, `cycleTheme`).
+- **Data layer (`test/unit/data.test.js`)** — `getEntries`, `findEntryById`/`findEntryIndexById`, and the CRUD calls (`fetchEntries`, `createEntry`, `updateEntry`, `deleteEntry`) with `axios` mocked: request method/URL/payload, id/timestamp preservation, store updates, and error propagation.
+- **AI proxy (`test/unit/ai-proxy.test.js`, `test/integration/ai-middleware.test.js`)** — `formatEntry`, `buildChatCompletionsUrl`, `describeUpstreamStatus`, and `requestReview` with `fetch` mocked, plus the middleware: `next()` passthrough, `400`/`500`/`200`, upstream `401`/`500` mapping, and `AbortError` → `504`.
+- **AI frontend helpers (`test/unit/ai-helpers.test.js`)** — `aiReviewFilename`, `describeAiReviewError`, `copyTextToClipboard` (clipboard + `execCommand` fallback), `downloadTextFile`, `ensureAiReviewSection`, `renderAiReviewStatus`/`renderAiReviewContent`, `bindAiReviewActions`, and `requestAiReview` with DOM and `axios` stubbed.
+- **App DOM & flows (`test/unit/scripts-dom.test.js`, `test/integration/scripts-flow.test.js`)** — category options, form collection/validation, card/list rendering, `applyFilters` (including the detail reset), detail render/reset/`syncActiveEntry`, list delegation, keyboard shortcuts, `refreshEntries`, and the create/update/delete flows.
+- **Category consistency (`test/unit/category-consistency.test.js`)** — guards that every `CATEGORY_OPTIONS` value maps to an icon and has a `[data-category]` colour rule.
+
+All planned phases (P0–P5) in `.doc/test-1.md` are implemented.
+
+### Continuous integration
+
+`.github/workflows/test.yml` runs `npm ci`, `npm test`, and `npm run test:coverage` on every push and pull request (Node 22).
+
+### How it stays offline
+
+The harness (`test/helpers/load-bundle.js`) loads `data.js`, `ai.js`, and `scripts.js` into a shared `node:vm` sandbox with stubbed `document`, `window`, `localStorage`, `axios`, `bootstrap`, `Swal`, `marked`, and `DOMPurify`. Every network call is mocked, so `npm test` never touches the network.
+
 ## Useful API Requests
 
 Retrieve all entries:

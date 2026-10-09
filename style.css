@@ -9,7 +9,7 @@
 [data-category="Data Pipeline"]  { --category-color: #146c43; }
 [data-category="Backtesting"]    { --category-color: #6f42c1; }
 [data-category="Infrastructure"] { --category-color: #495057; }
-[data-category="Javascript"]     { --category-color: #8a5a00; }
+[data-category="JavaScript"]     { --category-color: #8a5a00; }
 
 .badge-category {
   background-color: var(--category-color, var(--cat-default));
